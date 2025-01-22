@@ -72,13 +72,7 @@ bool handle_events(Scene&scene, Xsystem&xsystem, void*imagepointer)
 				// right arrow
 				case 114:
 					break;
-				case 43:	// H key
-					vmlSetMode(VML_HA|VML_FTZDAZ_CURRENT);
-					cout << "HIGH-ACCURACY mode is set" << endl;
-					break;
 				case 46:	// L key
-					vmlSetMode(VML_LA|VML_FTZDAZ_CURRENT);
-					cout << "LOW-ACCURACY mode is set" << endl;
 					break;
 				case 0x28:	//D key
 					for (auto&vertex:scene.vertices)
@@ -88,11 +82,16 @@ bool handle_events(Scene&scene, Xsystem&xsystem, void*imagepointer)
 						XDrawPoint(display, window, gc, pixel.x, pixel.y);
 					}
 					break;
+
 				case 0x27:	//S key
+					//saveToPNG(imagepointer, xresolution, yresolution, "png/" + scene.current_camera->image_name);
+					break;
+
+				case 0x19:	//P key
 					saveToPNG(imagepointer, xresolution, yresolution, "png/" + scene.current_camera->image_name);
 					break;
-				case 0x19://P key
-					scene.pathtracing = !scene.pathtracing;
+				case 43:	// H key
+					//sa
 					break;
 				}
                 break;
