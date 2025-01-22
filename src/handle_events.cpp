@@ -7,9 +7,10 @@
 #include "sendray.hh"
 #include "vector_utilities.hh"
 #include "test.hh"
+#include "submit.hh"
 
-#define xresolution xsystem.camera.image_resolution[0]
-#define yresolution xsystem.camera.image_resolution[1]
+#define xresolution scene.current_camera->image_resolution[0]
+#define yresolution scene.current_camera->image_resolution[1]
 
 void draw(Xsystem&xsystem, Path&path)
 {
@@ -22,7 +23,7 @@ void draw(Xsystem&xsystem, Path&path)
 }
 
 using namespace std;
-bool handle_events(Scene&scene, Xsystem&xsystem, void*pointer)
+bool handle_events(Scene&scene, Xsystem&xsystem, void*imagepointer)
 {
 	auto& display = xsystem.display;
 	auto& window = xsystem.window;
@@ -52,10 +53,8 @@ bool handle_events(Scene&scene, Xsystem&xsystem, void*pointer)
 					XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, xresolution, yresolution);
 					break;
 				case 111: // Up arrow
-					scene.debug_level++;
 					break;
 				case 116: // Down arrow
-					scene.debug_level--;
 					/* static auto iterator = scene.meshes.begin();
 					if (iterator == scene.meshes.end())	iterator = scene.meshes.begin();
 					cout << "event log -";
@@ -88,6 +87,9 @@ bool handle_events(Scene&scene, Xsystem&xsystem, void*pointer)
 						XSetForeground(display, gc, 0x00FF00);
 						XDrawPoint(display, window, gc, pixel.x, pixel.y);
 					}
+					break;
+				case 0x27:	//S key
+					saveToPNG(imagepointer, xresolution, yresolution, "png/" + scene.current_camera->image_name);
 					break;
 				case 0x19://P key
 					scene.pathtracing = !scene.pathtracing;
@@ -127,8 +129,8 @@ bool handle_events(Scene&scene, Xsystem&xsystem, void*pointer)
 
 						cout << "------------------------------------------------" << endl;
 						int yres = yresolution;
-						if (pointer == nullptr)	break;
-						auto image = (vector3(*)[yres])pointer;
+						if (imagepointer == nullptr)	break;
+						auto image = (vector3(*)[yres])imagepointer;
 						if (xsystem.camera.hdr)	cout << "processed image: " << image[x][y] << endl;
 					}
 					break;
