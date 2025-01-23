@@ -52,10 +52,13 @@ string timeof(unsigned long ns)
 	}
 }
 
-volatile bool running = false;
-std::chrono::_V2::system_clock::time_point t0, t1;
 #include <atomic>
 using std::atomic;
+
+atomic<int> totalsamples;
+
+volatile bool running = false;
+std::chrono::_V2::system_clock::time_point t0, t1;
 std::atomic<int> counter;	int max_count;
 void*estimate(void*)
 {
@@ -63,10 +66,10 @@ void*estimate(void*)
 	while (running)
 	{
 		sleep(1);	if (!running)	break;
-		float x1 = (float)counter / max_count;
+		float x1 = (float)totalsamples / max_count;
 		auto time1 = std::chrono::high_resolution_clock::now() - t0;
 		sleep(1);	if (!running)	break;
-		float x2 = (float)counter / max_count;
+		float x2 = (float)totalsamples / max_count;
 		auto time2 = std::chrono::high_resolution_clock::now() - t0;
 		
 		//t = a(1-e^x) + b
@@ -155,7 +158,6 @@ vector3 sample(int x, int y)
 	return sampled_color;
 }
 
-atomic<int> totalsamples;
 const int block_size = 10;
 void sampler(int blockx, int blocky)
 {
@@ -164,7 +166,7 @@ void sampler(int blockx, int blocky)
 	auto samples = (vector<vector3>(*)[yres])samplep;
 	auto image = (vector3(*)[yres])imagep;
 
-	cout << "sampler: " << blockx << " " << blocky << endl;
+	//cout << "sampler: " << blockx << " " << blocky << endl;
 
 	for (int y=blocky; y<yres && y < blocky+block_size; y++)
 	{
@@ -181,6 +183,10 @@ void sampler(int blockx, int blocky)
 			xsystem.imagedata[y*xres+x] = (int)image[x][y].x << 16 | (int)image[x][y].y << 8 | (int)image[x][y].z;
 		}
 	}
+
+	for (int y=blocky; y<yres && y < blocky+block_size; y++)
+		for (int x=blockx; x<xres && x < blockx+block_size; x++)
+			tasks[x][y].assigned = false;
 };
 
 int main(int argc, char **argv)
@@ -326,20 +332,21 @@ int main(int argc, char **argv)
 		cout << "--- Rendering Started : " << camera.image_name << " ---" << endl;
 		
 		running = true;
-		max_count = yresolution*xresolution;
+		max_count = yresolution*xresolution*camera.sample_count;
 		t0 = std::chrono::high_resolution_clock::now(), t1=t0;
 
 
-		//pthread_t estimating_thread;	pthread_create(&estimating_thread, nullptr, estimate, nullptr);	pthread_detach(estimating_thread);
+		pthread_t estimating_thread;	pthread_create(&estimating_thread, nullptr, estimate, nullptr);	pthread_detach(estimating_thread);
 		pthread_t event_thread;	pthread_create(&event_thread, nullptr, event_handler, nullptr);	pthread_detach(event_thread);
 		pthread_t task_thread;	pthread_create(&task_thread, nullptr, task_creator, nullptr);	pthread_detach(task_thread);
 		pthread_t viewer_thread;	pthread_create(&viewer_thread, nullptr, viewer, nullptr);	pthread_detach(viewer_thread);
 
 		float multiplier=1;	if (camera.pathtracing)	multiplier = 2 * M_PI;
 
+		totalsamples=0;
 		while (totalsamples<camera.sample_count*xresolution*yresolution)
 		{
-			cout << "totalsamples: " << (int)totalsamples << " pendingsamples: " << pendingsamples << " " << endl;
+			//cout << "totalsamples: " << (int)totalsamples << " pendingsamples: " << pendingsamples << " " << endl;
 			for (int y=0; y<yresolution; y++)
 				for (int x=0; x<xresolution; x++)
 				{
