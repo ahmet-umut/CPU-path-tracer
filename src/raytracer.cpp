@@ -19,6 +19,7 @@ Scene scene;
 Xsystem xsystem;
 #define xresolution camera.image_resolution[0]
 #define yresolution camera.image_resolution[1]
+
 #ifdef _xdebug  // include and global X11 variables
 #include "handle_events.hh"
 #include "x_utilities.hh"
@@ -53,6 +54,7 @@ string timeof(unsigned long ns)
 volatile bool running = false;
 std::chrono::_V2::system_clock::time_point t0, t1;
 #include <atomic>
+using std::atomic;
 std::atomic<int> counter;	int max_count;
 void*estimate(void*)
 {
@@ -93,6 +95,46 @@ void*event_handler(void*)
 	}
 	return nullptr;
 }
+
+struct Task
+{
+	int count;	bool assigned=false;
+};
+void*samples=nullptr;
+void*taskp=nullptr;
+
+volatile int pendingsamples=0;
+void*task_manager(void*)
+{
+	int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
+	auto tasks = (Task(*)[yres])taskp;
+	//tasks.reserve(xresolution * yresolution);
+	for (unsigned int y = 0; y < scene.current_camera->image_resolution[1]; y++)
+		for (unsigned int x = 0; x < scene.current_camera->image_resolution[0]; x++)
+			tasks[x][y].count=2, tasks[x][y].assigned=false;
+	pendingsamples = xres * yres * (scene.current_camera->sample_count-2);
+	return nullptr;
+}
+
+void sampler(int blockx, int blocky)
+{
+	constexpr int block_size = 1;
+	int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
+	auto tasks = (int(*)[yres])taskp;
+	auto samples = (vector<vector3>(*)[yres])taskp;
+
+	for (int y=blocky; y<yres && y < blockx+block_size; y++)
+	{
+		for (int x=blockx; x<xres && x < blockx+block_size; x++)
+		{
+			for (int sampleindex=0; sampleindex<tasks[x][y]; sampleindex++)
+			{
+				samples[x][y].push_back({0,0,0});
+				tasks[x][y]--;
+			}
+		}
+	}
+};
 
 int main(int argc, char **argv)
 {
@@ -187,6 +229,8 @@ int main(int argc, char **argv)
 		scene.current_camera = &camera;
 		scene.pathtracing = camera.pathtracing;
 
+		int xres = camera.image_resolution[0], yres = camera.image_resolution[1];
+
 		#ifdef _xdebug
 		usleep(100000/6);
 		switch (handle_events(scene, xsystem, imagep))
@@ -235,9 +279,11 @@ int main(int argc, char **argv)
 		running = true;
 		max_count = yresolution*xresolution;
 		t0 = std::chrono::high_resolution_clock::now(), t1=t0;
+		int _tasks[xresolution][yresolution];	taskp = _tasks;
 
 		pthread_t thread;	pthread_create(&thread, nullptr, estimate, nullptr);	pthread_detach(thread);
 		pthread_t event_thread;	pthread_create(&event_thread, nullptr, event_handler, nullptr);	pthread_detach(event_thread);
+		pthread_t task_thread;	pthread_create(&task_thread, nullptr, task_manager, nullptr);	pthread_detach(task_thread);
 
 		float multiplier=1;	if (camera.pathtracing)	multiplier = 2 * M_PI;
 
