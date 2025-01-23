@@ -56,6 +56,7 @@ string timeof(unsigned long ns)
 using std::atomic;
 
 atomic<int> totalsamples;
+int pendingsamples=0;
 
 volatile bool running = false;
 std::chrono::_V2::system_clock::time_point t0, t1;
@@ -77,7 +78,9 @@ void*estimate(void*)
 		float a = (float)(time1*x2/x1 - time2).count() / (1 - exp(x2) - x2/x1 + exp(x1)*x2/x1);
 		float b = (time2.count() - a * (1 - exp(x2))) / x2;
 
-		cout << "estimated remaining/total time: " << timeof(a * (1 - exp(1)) + b - time2.count()) << " / " << timeof(a * (1 - exp(1)) + b) << "  \r" << flush;
+		cout << "estimated remaining/total time: " << timeof(a * (1 - exp(1)) + b - time2.count()) << " / " << timeof(a * (1 - exp(1)) + b)
+			<< " pending samples: " << pendingsamples
+			<< "  \r" << flush;
 		if (timeoverflow)
 		{
 			//cout << endl << "estimator debug: a = " << a << " b = " << b << " x1 = " << x1 << " x2 = " << x2 << " time1 = " << time1.count() << " time2 = " << time2.count();
@@ -103,7 +106,7 @@ void*event_handler(void*)
 
 struct Task
 {
-	int count;	bool assigned=false;
+	std::atomic_int count;	bool assigned=false;
 };
 void*samplep=nullptr;
 void*taskp=nullptr;
@@ -117,10 +120,10 @@ float calculate_entropy(vector<vector3> samples)
 	float entropy=0;
 	for (auto&sample:samples)
 		entropy += norm(sample - mean);
+	entropy /= samples.size()*samples.size();
 	return entropy;
 }
 
-int pendingsamples=0;
 void*task_creator(void*)
 {
 	int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
@@ -131,33 +134,24 @@ void*task_creator(void*)
 		for (unsigned int x = 0; x < scene.current_camera->image_resolution[0]; x++)
 			tasks[x][y].count=2, tasks[x][y].assigned=false;
 	pendingsamples = xres * yres * (scene.current_camera->sample_count-2);
+	return nullptr;
 
 	while (pendingsamples > 0)
 	{
-		cout << "pendingsamples: " << pendingsamples << endl;
+		usleep(30000);
 		struct Block {int x=0,y=0; float entropy=-INFINITY;}  max_block;
-		int window_size = 1;
-		for (int y=0; y<yres; y+=window_size)
-			for (int x=0; x<xres; x+=window_size)
-			{
-				float entropy = 0;
-				for (int i=0; i<window_size; i++)
-					for (int j=0; j<window_size; j++)
-						entropy += calculate_entropy(samples[x+i][y+j]);
-				if (entropy > max_block.entropy)
-					max_block = {x,y,entropy};
-			}
-		if (max_block.entropy == -INFINITY)
-		{
-			cout << "no entropy found" << endl;
-			exit(1);
-		}
-		for (int x=max_block.x; x<max_block.x+window_size && x<xres; x++)
-			for (int y=max_block.y; y<max_block.y+window_size && y<yres; y++)
-			{
-				tasks[x][y].count++;
-				pendingsamples--;
-			}
+		int window_size = 100;
+		float entropies[xres][yres];
+		float mean_entropy=0;
+		for (int y=0; y<yres; y++)
+			for (int x=0; x<xres; x++) if (!tasks[x][y].assigned)
+				mean_entropy += entropies[x][y] = calculate_entropy(samples[x][y]);
+		mean_entropy /= xres*yres;
+		for (int y=0; y<yres; y++)
+			for (int x=0; x<xres; x++)
+				if (!tasks[x][y].assigned && entropies[x][y] > mean_entropy)
+					tasks[x][y].count++,
+					pendingsamples--;
 	}
 	return nullptr;
 }
@@ -382,7 +376,6 @@ int main(int argc, char **argv)
 		max_count = yresolution*xresolution*camera.sample_count;
 		t0 = std::chrono::high_resolution_clock::now(), t1=t0;
 
-
 		pthread_t estimating_thread;	pthread_create(&estimating_thread, nullptr, estimate, nullptr);	pthread_detach(estimating_thread);
 		pthread_t event_thread;	pthread_create(&event_thread, nullptr, event_handler, nullptr);	pthread_detach(event_thread);
 		pthread_t task_thread;	pthread_create(&task_thread, nullptr, task_creator, nullptr);	pthread_detach(task_thread);
@@ -391,9 +384,10 @@ int main(int argc, char **argv)
 		float multiplier=1;	if (camera.pathtracing)	multiplier = 2 * M_PI;
 
 		totalsamples=0;
-		while (totalsamples<camera.sample_count*xresolution*yresolution)
+		while (totalsamples < camera.sample_count*xresolution*yresolution)
 		{
 			//cout << "totalsamples: " << (int)totalsamples << " pendingsamples: " << pendingsamples << " " << endl;
+			#pragma omp parallel for
 			for (int y=0; y<yresolution; y++)
 				for (int x=0; x<xresolution; x++)
 				{
@@ -406,6 +400,20 @@ int main(int argc, char **argv)
 						t.detach();
 					}
 				}
+
+			struct Block {int x=0,y=0; float entropy=-INFINITY;}  max_block;
+			int window_size = 100;
+			float entropies[xres][yres];
+			float mean_entropy=0;
+			for (int y=0; y<yres; y++)
+				for (int x=0; x<xres; x++) if (!tasks[x][y].assigned)
+					mean_entropy += entropies[x][y] = calculate_entropy(samples[x][y]);
+			mean_entropy /= xres*yres;
+			for (int y=0; y<yres; y++)
+				for (int x=0; x<xres; x++)
+					if (!tasks[x][y].assigned && entropies[x][y] > mean_entropy)
+						tasks[x][y].count++,
+						pendingsamples--;
 		}
 		
 		running = false;
