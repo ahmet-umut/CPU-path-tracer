@@ -88,7 +88,8 @@ void*estimate(void*)
 	return nullptr;
 }
 
-void*imagep;
+void *imagep, *hdrimagep;
+
 volatile bool last_event = false;
 void*event_handler(void*)
 {
@@ -165,6 +166,7 @@ void sampler(int blockx, int blocky)
 	auto tasks = (Task(*)[yres])taskp;
 	auto samples = (vector<vector3>(*)[yres])samplep;
 	auto image = (vector3(*)[yres])imagep;
+	//auto hdrimage = (vector3(*)[yres])hdrimagep;
 
 	//cout << "sampler: " << blockx << " " << blocky << endl;
 
@@ -179,7 +181,11 @@ void sampler(int blockx, int blocky)
 				//cout << "sampler: " << x << " " << y << " " << sampleindex << endl;
 				totalsamples++;
 			}
-			image[x][y] = clamp(samples[x][y].back());
+			vector3 color={0,0,0};
+			for (auto&sample:samples[x][y])
+				color += sample;
+			color = color / samples[x][y].size();
+			image[x][y] = clamp(color);
 			xsystem.imagedata[y*xres+x] = (int)image[x][y].x << 16 | (int)image[x][y].y << 8 | (int)image[x][y].z;
 		}
 	}
