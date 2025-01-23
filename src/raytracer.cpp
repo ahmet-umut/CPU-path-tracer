@@ -128,21 +128,21 @@ void*viewer(void*)
 }
 
 atomic<int> totalsamples;
+const int block_size = 1;
 void sampler(int blockx, int blocky)
 {
-	constexpr int block_size = 1;
 	int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
 	auto tasks = (Task(*)[yres])taskp;
 	auto samples = (vector<vector3>(*)[yres])samplep;
 	auto image = (vector3(*)[yres])imagep;
 
-	for (int y=blocky; y<yres && y < blockx+block_size; y++)
+	for (int y=blocky; y<yres && y < blocky+block_size; y++)
 	{
 		for (int x=blockx; x<xres && x < blockx+block_size; x++)
 		{
 			for (int sampleindex=0; sampleindex<tasks[x][y].count; sampleindex++)
 			{
-				samples[x][y].push_back({0,0,0});
+				samples[x][y].push_back({111,111,111});
 				tasks[x][y].count--;
 				cout << "sampler: " << x << " " << y << " " << sampleindex << endl;
 				totalsamples++;
@@ -300,7 +300,7 @@ int main(int argc, char **argv)
 		t0 = std::chrono::high_resolution_clock::now(), t1=t0;
 
 
-		pthread_t estimating_thread;	pthread_create(&estimating_thread, nullptr, estimate, nullptr);	pthread_detach(estimating_thread);
+		//pthread_t estimating_thread;	pthread_create(&estimating_thread, nullptr, estimate, nullptr);	pthread_detach(estimating_thread);
 		pthread_t event_thread;	pthread_create(&event_thread, nullptr, event_handler, nullptr);	pthread_detach(event_thread);
 		pthread_t task_thread;	pthread_create(&task_thread, nullptr, task_creator, nullptr);	pthread_detach(task_thread);
 		pthread_t viewer_thread;	pthread_create(&viewer_thread, nullptr, viewer, nullptr);	pthread_detach(viewer_thread);
@@ -309,13 +309,19 @@ int main(int argc, char **argv)
 
 		while (totalsamples<camera.sample_count*xresolution*yresolution)
 		{
+			cout << "totalsamples: " << (int)totalsamples << " pendingsamples: " << pendingsamples << " " << endl;
 			for (int y=0; y<yresolution; y++)
 				for (int x=0; x<xresolution; x++)
 				{
 					if (tasks[x][y].count)
 					{
-						cout << "sampling " << x << " " << y << " " << tasks[x][y].count << endl;
+						for (int blockx=x; blockx<xresolution && blockx < x+block_size; blockx++)
+							for (int blocky=y; blocky<yresolution && blocky < y+block_size; blocky++)
+								tasks[blockx][blocky].assigned = true;
 						sampler(x, y);
+						for (int blockx=x; blockx<xresolution && blockx < x+block_size; blockx++)
+							for (int blocky=y; blocky<yresolution && blocky < y+block_size; blocky++)
+								tasks[blockx][blocky].assigned = false;
 					}
 				}
 		}
