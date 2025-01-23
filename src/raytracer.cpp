@@ -121,11 +121,38 @@ void*viewer(void*)
 {
 	while (running)
 	{
-		sleep(1);	if (!running)	break;
+		usleep(40000);	if (!running)	break;
 		XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, scene.current_camera->image_resolution[0], scene.current_camera->image_resolution[1]);
 	}
 	XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, scene.current_camera->image_resolution[0], scene.current_camera->image_resolution[1]);
 	return nullptr;
+}
+
+vector3 sample(int x, int y)
+{
+	auto&camera = scene.current_camera;
+	auto&right = xsystem.right;
+	auto&up = xsystem.up;
+	auto&deep = xsystem.deep;
+	auto&screen_center = xsystem.screen_center;
+
+	int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
+	double random_x = drand48()-0.5, random_y = drand48()-0.5;
+
+	float ystep = (-camera->near_plane[2] + camera->near_plane[3]) / yres;
+	float xstep = (-camera->near_plane[0] + camera->near_plane[1]) / xres;
+
+	vector3 sampled_pixel_position = xsystem.screen_center + xsystem.right * ((float)x - xres/2 + random_x) * ystep + -xsystem.up * ((float)y - yres/2 + random_y) * xstep;
+
+	vector3 sampled_camera_position = camera->position;
+	vector3 target = (sampled_pixel_position +- camera->position) * (1 + camera->focus_distance / camera->near_distance);
+
+	Ray ray = {sampled_camera_position, target};
+	vector3 sampled_color = sendray(scene, ray, false,0,0, {x,y,true});
+	//cout << "sampled position: " << sampled_pixel_position << endl;
+	//cout << "sampled_color: " << sampled_color << endl;
+	//exit(0);
+	return sampled_color;
 }
 
 atomic<int> totalsamples;
@@ -145,7 +172,7 @@ void sampler(int blockx, int blocky)
 		{
 			for (int sampleindex=0; sampleindex<tasks[x][y].count; sampleindex++)
 			{
-				samples[x][y].push_back({111,111,111});
+				samples[x][y].push_back(sample(x, y));
 				tasks[x][y].count--;
 				//cout << "sampler: " << x << " " << y << " " << sampleindex << endl;
 				totalsamples++;
