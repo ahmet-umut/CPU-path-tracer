@@ -47,7 +47,7 @@ void saveToEXR(void* data, int xres, int yres, const std::string& filename) {
 void saveToPNG(void* data, int xres, int yres, const std::string& filename) {
     auto image = (vector3(*)[yres])data;
 
-    FILE* fp = fopen(filename.c_str(), "wb");
+    FILE* fp = fopen((filename+".png").c_str(), "wb");
     if (!fp) {
         throw std::runtime_error("Failed to open file for writing PNG");
     }

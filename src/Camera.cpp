@@ -59,7 +59,13 @@ Camera::Camera(xmlNode*node)
 				iaccui = read_int_array(cur_node),
 				image_resolution[0] = iaccui[0], image_resolution[1] = iaccui[1];
 			else if (match(cur_node, "ImageName"))
-				image_name = (const char*)xmlNodeGetContent(cur_node);
+				{
+					//remove the extension
+					const char *name = (const char*)xmlNodeGetContent(cur_node);
+					int i=0;
+					for (; name[i] && name[i]!='.'; i++)
+						image_name.push_back(name[i]);
+				}
 			else if (match(cur_node, "NumSamples"))
 				sample_count = atoi((const char*)xmlNodeGetContent(cur_node));
 			else if (match(cur_node, "FocusDistance"))
