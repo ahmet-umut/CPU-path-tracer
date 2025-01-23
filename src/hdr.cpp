@@ -24,25 +24,37 @@ void applyHDRTonemapping(Xsystem xsystem, int xresolution, int yresolution, void
 	float luminances[yresolution*xresolution];
 	for (unsigned int y = 0; y < yresolution; y++)
 		for (unsigned int x = 0; x < xresolution; x++)
-			luminances[y * xresolution + x] = luminance(image[x][y]);
+			luminances[y * xresolution + x] = luminance(image[x][y]),
+			#define delta 1e-0
+			lw += log(luminances[y * xresolution + x] + delta) / xresolution / yresolution;
 	std::sort(luminances, luminances + xresolution * yresolution);
+	cout << "HDR.lw.0: " << lw << endl;
+	lw = exp(lw);
+	cout << "HDR.lw.1: " << lw << endl;
 
 	float lwhite=INFINITY;
 	//if (xsystem.camera.burn_percent)
 		lwhite = luminances[lrint((xresolution * yresolution * (100-xsystem.camera.burn_percent)) / 100)];
 	cout << "HDR.lwhite: " << lwhite << endl;
 
-	#define delta 1e-0
-	for (auto&luminance:luminances)
+	/* for (auto&luminance:luminances)
 	{
+		static bool okay=true;
 		if (luminance <= 0)	;
 		else	lw += log(luminance) / xresolution / yresolution;
-		if (lw==lw)	cout << "lw: " << lw << "  \r";
+		if (lw==lw)	cout << "lw: " << lw << " luminance: " << luminance << "  \r";
+		else if (okay)
+		{
+			cout<<endl;
+			cout << "lw is nan" << endl;
+			cout << "lw: " << lw << " luminance: " << luminance << endl;
+			okay=false;
+		}
 	}
 	cout <<endl;
 	cout << "HDR.lw.0: sum of log(1e-9 + luminance(image[x][y])): " << lw << endl;
 	lw = exp(lw);
-	cout << "HDR.lw.1: exp(lw.0 / (xresolution * yresolution)): " << lw << endl;
+	cout << "HDR.lw.1: exp(lw.0 / (xresolution * yresolution)): " << lw << endl; */
 
 	for (unsigned int y = 0; y < yresolution; y++)
 		for (unsigned int x = 0; x < xresolution; x++)

@@ -82,6 +82,18 @@ void*estimate(void*)
 	return nullptr;
 }
 
+void*imagep;
+volatile bool last_event = false;
+void*event_handler(void*)
+{
+	while (running)
+	{
+		usleep(100000/6);	if (!running)	break;
+		last_event = handle_events(scene, xsystem, imagep);
+	}
+	return nullptr;
+}
+
 int main(int argc, char **argv)
 {
 	unsigned int camera_index=-1;
@@ -174,7 +186,6 @@ int main(int argc, char **argv)
 	{
 		scene.current_camera = &camera;
 		scene.pathtracing = camera.pathtracing;
-		static void* imagep;
 
 		#ifdef _xdebug
 		usleep(100000/6);
@@ -220,22 +231,15 @@ int main(int argc, char **argv)
 		vector3 image[xresolution][yresolution];	imagep = image;
 
 		cout << "--- Rendering Started : " << camera.image_name << " ---" << endl;
-		/* static bool __debugger=true;
-		if (__debugger)
-		{
-			__debugger=false;
-			continue;
-		} */
-
+		
+		running = true;
 		max_count = yresolution*xresolution;
 		t0 = std::chrono::high_resolution_clock::now(), t1=t0;
-		pthread_t thread;
-		running = true;
-		pthread_create(&thread, nullptr, estimate, nullptr);	pthread_detach(thread);
 
-		float multiplier=1;
-		if (camera.pathtracing)
-			multiplier = 2 * M_PI;
+		pthread_t thread;	pthread_create(&thread, nullptr, estimate, nullptr);	pthread_detach(thread);
+		pthread_t event_thread;	pthread_create(&event_thread, nullptr, event_handler, nullptr);	pthread_detach(event_thread);
+
+		float multiplier=1;	if (camera.pathtracing)	multiplier = 2 * M_PI;
 
 		#pragma omp parallel
 		{
@@ -243,7 +247,7 @@ int main(int argc, char **argv)
 			for (unsigned int y = 0; y < yresolution; y++)
 			{
 				#ifdef _xdebug
-				handle_events(scene, xsystem, image);
+				//handle_events(scene, xsystem, image);
 				#endif
 				for (unsigned int x = 0; x < xresolution; x++)
 				{
