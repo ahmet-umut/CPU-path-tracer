@@ -113,10 +113,10 @@ bool handle_events(Scene&scene, Xsystem&xsystem, void*imagepointer)
 						xsystem.tree.position = {x,y,true};
 						xsystem.tree.paths.clear();
 
-						xsystem.mirror_path.clear();
 						sendray(scene,ray,true, 0,0, {x,y,true}, &xsystem, &xsystem.tree);
 						draw(xsystem, xsystem.tree);
 
+						//xsystem.mirror_path.clear();
 						/* XPoint points[xsystem.mirror_path.size()];
 						for (int i=0; i<xsystem.mirror_path.size(); i++)
 						{

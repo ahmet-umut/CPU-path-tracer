@@ -135,10 +135,18 @@ struct Intersection Ray::intersect(Triangle& triangle)
 static vector3 transform(const matrix& m, vector3 v, bool position=true)
 {
 	if (m.is_identity())	return v;
-	vector4 v4 = v;	v4.x3=position;
-	v4 *= m;
-	//v4 = m * v4;
-	return v4;
+	vector3 result3;
+	vector4 result4;
+	switch (position)
+	{
+	case false:
+		cblas_sgemv(CblasRowMajor, CblasNoTrans, 3, 3, 1, (float*)&m, 4, (float*)&v, 1, 0, (float*)&result3, 1);	//lda is 4 because m is a 4x4 matrix
+		return result3;
+	case true:
+		result4 = v;	result4.x3=1;
+		result4 *= m;
+		return result4;	
+	}
 }
 using namespace std;
 #include <iostream>

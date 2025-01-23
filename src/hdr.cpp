@@ -34,10 +34,11 @@ void applyHDRTonemapping(Xsystem xsystem, int xresolution, int yresolution, void
 
 	#define delta 1e0
 	for (auto&luminance:luminances)
-		lw += log(delta + luminance);
+		lw += log(delta + luminance) / xresolution / yresolution;
 	cout << "HDR.lw.0: sum of log(1e-9 + luminance(image[x][y])): " << lw << endl;
+	lw = exp(lw);
+	cout << "HDR.lw.1: exp(lw.0 / (xresolution * yresolution)): " << lw << endl;
 
-	lw = exp(lw / (xresolution * yresolution)); 
 	for (unsigned int y = 0; y < yresolution; y++)
 		for (unsigned int x = 0; x < xresolution; x++)
 		{
@@ -58,5 +59,4 @@ void applyHDRTonemapping(Xsystem xsystem, int xresolution, int yresolution, void
 			#endif
 			image[x][y] = color;
 		}
-	cout << "HDR.lw.1: exp(lw.0 / (xresolution * yresolution)): " << lw << endl;
 }

@@ -12,6 +12,7 @@ Texture::Texture(xmlNode*node)
 		string type = typeprop;
 		if (type == "image")	source=image;
 		else if (type == "checkerboard")	source=kareli;
+		else if (type == "perlin")	source=noise;
 		else cout << "invalid texture type=" << typeprop << endl;
 	}
 	else cout << "no type property in texture" << endl;
@@ -122,6 +123,15 @@ vector3 Texture::getcolor(vector3 coords, std::vector<std::vector<std::vector<ve
 				return {0,0,0};
 			else
 				return {1,1,1};
+			break;
+		}
+	case noise:
+		{
+			//perlin noise
+			//not implemented
+			//cout << "Noise texture not implemented" << endl;
+			//exit(0);
+			return {0,0,0};
 			break;
 		}
 	default:

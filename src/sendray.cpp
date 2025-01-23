@@ -130,8 +130,10 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 			cout << "ray hit " << material << " " << first.getobject()->say() << " " << first.getobject()->getid() << " at " << first.position << endl;
 			cout << "object has " << first.gettextures().size() << " textures" << endl;
 
-			xsystem->mirror_path.push_back(shadow_start = test(*xsystem, first.position));
+			//xsystem->mirror_path.push_back(shadow_start = test(*xsystem, first.position));
 			tree->position = shadow_start;
+
+			cout << "test" << endl;
 		}
 
 		correction = first.normal * scene.shadow_ray_epsilon;
@@ -274,11 +276,13 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 			}
 			reflectionray = {first.position + correction, reflection};
 			//mirror = piecewise(first.object_pointer->getmaterial().mirror, sendray(reflectionray, verbose, depth + 1, pathlength));
+			Path*node=nullptr;
 			if (verbose)
 			{
 				cout << "sending mirror ray, depth: " << depth << endl;
+				node = &tree->paths.emplace_back(test(*xsystem, first.position), 0xFF0606);
 			}
-			mirror = sendray(scene, reflectionray, verbose, depth + 1, pathlength, {0,0,false}, xsystem);
+			mirror = sendray(scene, reflectionray, verbose, depth + 1, pathlength, {0,0,false}, xsystem, node);
 			vsMul(3, (float*)&first.getobject()->getmaterial().mirror, (float*)&mirror, (float*)&mirror);
 		}
 		if (first.getobject()->getmaterial().is_dielectric())
@@ -598,20 +602,21 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 					vsMul(3, (float*)&irradiance, (float*)&spec, (float*)&spec);
 					vsAdd(3, (float*)&specular, (float*)&spec, (float*)&specular);
 				}
+				if (verbose)
+				{
+					auto pixel2 = test(*xsystem, shadowray.getend());
+					XSetForeground(xsystem->display, xsystem->gc, 0x00FF00);
+					XDrawLine(xsystem->display, xsystem->window, xsystem->gc, shadow_start.x, shadow_start.y, pixel2.x, pixel2.y);
+				}
 				break;
 			case true:	//object is in shadow
 				//Do nothing, basically (since we are not adding anything to the color)
-				if (second.getobject()->getmaterial().is_dielectric())
-				{
-					if (verbose)
-					{
-						std::cout << "object is in shadow of dielectric " << second.getobject()->say() << endl
-								  << "second.position: " << second.position << endl;
-					}
-				}
-				else if (verbose)
+				if (verbose)
 				{
 					std::cout << "object is in shadow of " << second.getobject()->say() << " " << second.getobject()->getid() << endl;
+					auto pixel2 = test(*xsystem, second.position);
+					XSetForeground(xsystem->display, xsystem->gc, 0xFF0000);
+					XDrawLine(xsystem->display, xsystem->window, xsystem->gc, shadow_start.x, shadow_start.y, pixel2.x, pixel2.y);
 				}
 			}
 		}

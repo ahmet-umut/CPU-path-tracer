@@ -5,7 +5,7 @@
 struct Texture
 {
 	enum {null, bump,all,kd_replace,kd_blend,background} type;
-	enum {image,kareli} source=image;
+	enum {image,kareli,noise} source=image;
 	enum {bilinear} interpolation;
 	enum {absval,linear} noise_conversion;
 	int image_index;
