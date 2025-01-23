@@ -378,15 +378,25 @@ int main(int argc, char **argv)
 
 		pthread_t estimating_thread;	pthread_create(&estimating_thread, nullptr, estimate, nullptr);	pthread_detach(estimating_thread);
 		pthread_t event_thread;	pthread_create(&event_thread, nullptr, event_handler, nullptr);	pthread_detach(event_thread);
-		pthread_t task_thread;	pthread_create(&task_thread, nullptr, task_creator, nullptr);	pthread_detach(task_thread);
+		//pthread_t task_thread;	pthread_create(&task_thread, nullptr, task_creator, nullptr);	pthread_detach(task_thread);
 		pthread_t viewer_thread;	pthread_create(&viewer_thread, nullptr, viewer, nullptr);	pthread_detach(viewer_thread);
 
 		float multiplier=1;	if (camera.pathtracing)	multiplier = 2 * M_PI;
+
+			//int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
+			//auto tasks = (Task(*)[yres])taskp;
+			//auto samples = (vector<vector3>(*)[yres])samplep;
+			//tasks.reserve(xresolution * yresolution);
+			for (unsigned int y = 0; y < scene.current_camera->image_resolution[1]; y++)
+				for (unsigned int x = 0; x < scene.current_camera->image_resolution[0]; x++)
+					tasks[x][y].count=2, tasks[x][y].assigned=false;
+			pendingsamples = xres * yres * (scene.current_camera->sample_count-2);
 
 		totalsamples=0;
 		while (totalsamples < camera.sample_count*xresolution*yresolution)
 		{
 			//cout << "totalsamples: " << (int)totalsamples << " pendingsamples: " << pendingsamples << " " << endl;
+
 			#pragma omp parallel for
 			for (int y=0; y<yresolution; y++)
 				for (int x=0; x<xresolution; x++)
@@ -396,8 +406,7 @@ int main(int argc, char **argv)
 						for (int bx=x; bx<x+block_size && bx<xresolution; bx++)
 							for (int by=y; by<y+block_size && by<yresolution; by++)
 								tasks[bx][by].assigned = true;
-						std::thread t(sampler, x, y);
-						t.detach();
+						sampler(x, y);
 					}
 				}
 
