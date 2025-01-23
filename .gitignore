@@ -5,13 +5,12 @@ CMakeCache.txt
 miniz.o
 *.xml
 /textures
-/ply
 /models
-/ton_*
 /CMakeFiles
 gmon.out
-/berserker_ply_ply
 /geometry
+
+*/*.ply
 
 /png
 /exr

@@ -402,9 +402,9 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 				for (int splitindex=0; splitindex<splitcount; splitindex++)
 				{
 					//uniformly sample the hemisphere
-					float xz = drand48() * 2 * M_PI, r = drand48();	r = sqrt(r);
 					vector3 w = first.normal, u = perp_dir(w).normalize(), v = w.cross(u).normalize();
-					vector3 d = u * cos(xz) * r + v * sin(xz) * r + w * sqrt(1 - r * r);
+					float xz = drand48() * 2 * M_PI, h = drand48(), r = sqrt(1-h*h);
+					vector3 d = u * cos(xz) * r + v * sin(xz) * r + w * h;
 					Ray newray(first.position + correction, d);
 
 					Path*path = nullptr;
