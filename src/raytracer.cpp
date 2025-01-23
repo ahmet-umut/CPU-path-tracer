@@ -246,9 +246,6 @@ int main(int argc, char **argv)
 			#pragma omp for nowait
 			for (unsigned int y = 0; y < yresolution; y++)
 			{
-				#ifdef _xdebug
-				//handle_events(scene, xsystem, image);
-				#endif
 				for (unsigned int x = 0; x < xresolution; x++)
 				{
 					vector3 color = {0, 0, 0};
