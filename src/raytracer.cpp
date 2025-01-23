@@ -100,11 +100,11 @@ struct Task
 {
 	int count;	bool assigned=false;
 };
-void*samples=nullptr;
+void*samplep=nullptr;
 void*taskp=nullptr;
 
 volatile int pendingsamples=0;
-void*task_manager(void*)
+void*task_creator(void*)
 {
 	int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
 	auto tasks = (Task(*)[yres])taskp;
@@ -116,22 +116,39 @@ void*task_manager(void*)
 	return nullptr;
 }
 
+void*viewer(void*)
+{
+	while (running)
+	{
+		sleep(1);	if (!running)	break;
+		XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, scene.current_camera->image_resolution[0], scene.current_camera->image_resolution[1]);
+	}
+	XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, scene.current_camera->image_resolution[0], scene.current_camera->image_resolution[1]);
+	return nullptr;
+}
+
+atomic<int> totalsamples;
 void sampler(int blockx, int blocky)
 {
 	constexpr int block_size = 1;
 	int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
-	auto tasks = (int(*)[yres])taskp;
-	auto samples = (vector<vector3>(*)[yres])taskp;
+	auto tasks = (Task(*)[yres])taskp;
+	auto samples = (vector<vector3>(*)[yres])samplep;
+	auto image = (vector3(*)[yres])imagep;
 
 	for (int y=blocky; y<yres && y < blockx+block_size; y++)
 	{
 		for (int x=blockx; x<xres && x < blockx+block_size; x++)
 		{
-			for (int sampleindex=0; sampleindex<tasks[x][y]; sampleindex++)
+			for (int sampleindex=0; sampleindex<tasks[x][y].count; sampleindex++)
 			{
 				samples[x][y].push_back({0,0,0});
-				tasks[x][y]--;
+				tasks[x][y].count--;
+				cout << "sampler: " << x << " " << y << " " << sampleindex << endl;
+				totalsamples++;
 			}
+			image[x][y] = clamp(samples[x][y].back());
+			xsystem.imagedata[y*xres+x] = (int)image[x][y].x << 16 | (int)image[x][y].y << 8 | (int)image[x][y].z;
 		}
 	}
 };
@@ -273,79 +290,36 @@ int main(int argc, char **argv)
 		#endif
 
 		vector3 image[xresolution][yresolution];	imagep = image;
+		Task tasks[xresolution][yresolution];	taskp = tasks;
+		vector<vector3> samples[xresolution][yresolution];	samplep = samples;
 
 		cout << "--- Rendering Started : " << camera.image_name << " ---" << endl;
 		
 		running = true;
 		max_count = yresolution*xresolution;
 		t0 = std::chrono::high_resolution_clock::now(), t1=t0;
-		int _tasks[xresolution][yresolution];	taskp = _tasks;
 
-		pthread_t thread;	pthread_create(&thread, nullptr, estimate, nullptr);	pthread_detach(thread);
+
+		pthread_t estimating_thread;	pthread_create(&estimating_thread, nullptr, estimate, nullptr);	pthread_detach(estimating_thread);
 		pthread_t event_thread;	pthread_create(&event_thread, nullptr, event_handler, nullptr);	pthread_detach(event_thread);
-		pthread_t task_thread;	pthread_create(&task_thread, nullptr, task_manager, nullptr);	pthread_detach(task_thread);
+		pthread_t task_thread;	pthread_create(&task_thread, nullptr, task_creator, nullptr);	pthread_detach(task_thread);
+		pthread_t viewer_thread;	pthread_create(&viewer_thread, nullptr, viewer, nullptr);	pthread_detach(viewer_thread);
 
 		float multiplier=1;	if (camera.pathtracing)	multiplier = 2 * M_PI;
 
-		#pragma omp parallel
+		while (totalsamples<camera.sample_count*xresolution*yresolution)
 		{
-			#pragma omp for nowait
-			for (unsigned int y = 0; y < yresolution; y++)
-			{
-				for (unsigned int x = 0; x < xresolution; x++)
+			for (int y=0; y<yresolution; y++)
+				for (int x=0; x<xresolution; x++)
 				{
-					vector3 color = {0, 0, 0};
-					for (unsigned char sample=0; sample<camera.sample_count; sample++)
+					if (tasks[x][y].count)
 					{
-						double random_x = drand48()-0.5, random_y = drand48()-0.5;
-						vector3 sampled_pixel_position = xsystem.screen_center + right * ((float)x - xresolution/2 + random_x) * xsystem.ystep + -up * ((float)y - yresolution/2 + random_y) * xsystem.xstep;
-
-						if (sampled_pixel_position.x != sampled_pixel_position.x)	{cout << "sampled_pixel_position.x is nan" << endl;	cout << xsystem.screen_center << endl; cout << right << endl; cout << x << endl; cout << random_x << endl; cout << y << endl; cout << random_y << endl; exit(1);}
-
-						vector3 sampled_camera_position = camera.position;
-						//cout << "camera position: " << camera.position << endl;
-						if (camera.aperture_size > 0)
-						{
-							/* cout << "aperture size: " << camera.aperture_size << endl;
-							cout << "focus distance: " << camera.focus_distance << endl;
-							exit(0); */
-
-							float random_angle = drand48() * 2 * M_PI;
-							float random_radius = drand48();
-							random_radius*=random_radius*camera.aperture_size/2;	//radius is aperture size over 2
-							vector3 aperture_sample = right * random_radius * cos(random_angle) + up * random_radius * sin(random_angle);
-							sampled_camera_position = camera.position + aperture_sample;
-							//cout << "aperture sample: " << aperture_sample << endl;
-						}
-
-						vector3 target = (sampled_pixel_position +- camera.position) * (1 + camera.focus_distance / camera.near_distance) + camera.position;
-
-						if (target.x != target.x)	{cout << "target.x is nan" << endl; cout << sampled_pixel_position << endl; cout << camera.position << endl;
-							exit(1);}
-						if (target.y != target.y)	{cout << "target.y is nan" << endl; exit(1);}
-						if (target.z != target.z)	{cout << "target.z is nan" << endl; exit(1);}
-
-						Ray ray = {sampled_camera_position, target-sampled_camera_position};
-						vector3 sampled_color = sendray(scene, ray, false,0,0, {x,y,true});
-						color = color + sampled_color;
+						cout << "sampling " << x << " " << y << " " << tasks[x][y].count << endl;
+						sampler(x, y);
 					}
-					color = color / camera.sample_count * multiplier;
-					if (!camera.hdr)
-						color = clamp(color);
-					image[x][y] = color;
-					#ifdef _xdebug
-					xsystem.imagedata[y * xresolution + x] = ((unsigned int)color.x<<16) + ((unsigned int)color.y<<8) + (unsigned int)color.z;
-					#endif
-
-					counter++;
 				}
-				#ifdef _xdebug
-				XImage*image = XCreateImage(display, DefaultVisual(display, 0), DefaultDepth(display, 0), ZPixmap, 0, (char*)(xsystem.imagedata + y*xresolution), xresolution, 1, 32, 0);
-				XInitImage(image);
-				XPutImage(display, window, gc, image, 0, 0, 0, y, xresolution, 1);
-				#endif
-			}
 		}
+		
 		running = false;
 		t1 = std::chrono::high_resolution_clock::now();
 
