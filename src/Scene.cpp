@@ -83,6 +83,7 @@ Scene::Scene(const char * filename)
 					(
 						match(light_node, "PointLight")
 					)
+						lights.emplace_back(new _PointLight(light_node)),
 						point_lights.emplace_back(light_node);
 					else if
 					(

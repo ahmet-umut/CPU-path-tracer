@@ -13,17 +13,16 @@ class _PointLight : public Light
 public:
 	vector3 position, intensity;
 	_PointLight(vector3 position, vector3 intensity) : position(position), intensity(intensity) {}
-	Ray sample_ray(const vector3 & start) const override
-	{
-		Ray ray(start, position-start);
-		ray.length = norm(position - start);
-		return ray;
-	}
-	vector3 getradiance(Ray & ray) const override
-	{
-		return intensity / powf(ray.length, 2);
-	}
+	_PointLight(xmlNode*node);
+	Ray sample_ray(const vector3 & start) const override;
+	vector3 getradiance(Ray & ray) const override;
 };
+
+#include "vector_utilities.hh"
+static float cos_vv(const vector3& a, const vector3& b)
+{
+	return cblas_sdot(3, (float*)&a, 1, (float*)&b, 1) / norm(a) / norm(b);
+}
 
 class _AreaLight : public Light
 {

@@ -5,6 +5,7 @@
 #include <X11/Xlib.h>
 #include <libxml2/libxml/parser.h>
 #include "objects.hh"
+#include "Light.hh"
 
 using std::vector;
 //using vector3=double[3];
@@ -62,10 +63,13 @@ struct Scene
 	float shadow_ray_epsilon=.001;
 	vector<Camera> cameras;
 	Camera*current_camera;
-	vector<PointLight> point_lights;
-	vector<AreaLight> area_lights;
 	enum {color, latlong,probe,replace} background_type = color;
 	Background background;
+
+	vector<Light*> lights;
+
+	vector<AreaLight> area_lights;
+	vector<PointLight> point_lights;
 	vector<DirectionalLight> directional_lights;
 	vector<SpotLight> spot_lights;
 	vector<Sphere> spheres;

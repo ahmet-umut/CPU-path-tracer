@@ -1,16 +1,12 @@
 #include "sendray.hh"
 #include <iostream>
-#include "intersection.hh"
+#include "intersect.hh"
 #include "vector_utilities.hh"
 #include "sphere2d.hh"
 #include "test.hh"
 #include "Light.hh"
 using namespace std;
 
-float cos_vv(const vector3& a, const vector3& b)
-{
-	return cblas_sdot(3, (float*)&a, 1, (float*)&b, 1) / norm(a) / norm(b);
-}
 static float cosclamp(const vector3& a, vector3 b)
 {
 	float result = cblas_sdot(3, (float*)&a, 1, (float*)&b, 1);

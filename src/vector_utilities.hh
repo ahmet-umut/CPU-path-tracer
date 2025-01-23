@@ -1,3 +1,4 @@
+#pragma once
 #include "vector.hh"
 inline float norm(const vector3& v)
 {

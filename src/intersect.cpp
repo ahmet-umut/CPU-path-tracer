@@ -1,6 +1,7 @@
-#include "intersection.hh"
+#include "intersect.hh"
 #include "Ray.hh"
 #include "vector_utilities.hh"
+#include "Scene.hh"
 #include <iostream>
 using namespace std;
 struct Intersection intersect(Scene&scene, Ray ray, bool verbose)

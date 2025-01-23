@@ -1,5 +1,6 @@
 #include "Ray.hh"
 #include "vector_utilities.hh"
+#include <iostream>
 using namespace std;
 
 Ray::Ray(const vector3&start, const vector3&direction, float length):

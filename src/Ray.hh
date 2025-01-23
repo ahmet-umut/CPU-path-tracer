@@ -1,6 +1,7 @@
 #pragma once
 #include "vector.hh"
 #include "objects.hh"
+#include "intersection.hh"
 class Ray
 {
 public:
@@ -24,5 +25,3 @@ public:
 	float getxzangl();
 	float getyangl();
 };
-#include "intersection.hh"
-Intersection intersect(Scene&scene, Ray ray, bool verbose=false);

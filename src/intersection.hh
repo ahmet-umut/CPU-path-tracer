@@ -1,6 +1,6 @@
 #pragma once
 #include "vector.hh"
-#include "Scene.hh"
+#include "objects.hh"
 #include <iostream>
 struct Intersection
 {
