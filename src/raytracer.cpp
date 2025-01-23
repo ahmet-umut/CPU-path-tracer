@@ -108,16 +108,57 @@ struct Task
 void*samplep=nullptr;
 void*taskp=nullptr;
 
-volatile int pendingsamples=0;
+float calculate_entropy(vector<vector3> samples)
+{
+	vector3 mean={0,0,0};
+	for (auto&sample:samples)
+		mean += sample;
+	mean = mean / samples.size();
+	float entropy=0;
+	for (auto&sample:samples)
+		entropy += norm(sample - mean);
+	return entropy;
+}
+
+int pendingsamples=0;
 void*task_creator(void*)
 {
 	int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
 	auto tasks = (Task(*)[yres])taskp;
+	auto samples = (vector<vector3>(*)[yres])samplep;
 	//tasks.reserve(xresolution * yresolution);
 	for (unsigned int y = 0; y < scene.current_camera->image_resolution[1]; y++)
 		for (unsigned int x = 0; x < scene.current_camera->image_resolution[0]; x++)
 			tasks[x][y].count=2, tasks[x][y].assigned=false;
 	pendingsamples = xres * yres * (scene.current_camera->sample_count-2);
+
+	while (pendingsamples > 0)
+	{
+		cout << "pendingsamples: " << pendingsamples << endl;
+		struct Block {int x=0,y=0; float entropy=-INFINITY;}  max_block;
+		int window_size = 1;
+		for (int y=0; y<yres; y+=window_size)
+			for (int x=0; x<xres; x+=window_size)
+			{
+				float entropy = 0;
+				for (int i=0; i<window_size; i++)
+					for (int j=0; j<window_size; j++)
+						entropy += calculate_entropy(samples[x+i][y+j]);
+				if (entropy > max_block.entropy)
+					max_block = {x,y,entropy};
+			}
+		if (max_block.entropy == -INFINITY)
+		{
+			cout << "no entropy found" << endl;
+			exit(1);
+		}
+		for (int x=max_block.x; x<max_block.x+window_size && x<xres; x++)
+			for (int y=max_block.y; y<max_block.y+window_size && y<yres; y++)
+			{
+				tasks[x][y].count++;
+				pendingsamples--;
+			}
+	}
 	return nullptr;
 }
 
