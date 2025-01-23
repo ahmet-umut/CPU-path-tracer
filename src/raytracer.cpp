@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <array>
 #include <pthread.h>
+#include <thread>
 
 #include "sendray.hh"
 #include "vector_utilities.hh"
@@ -128,13 +129,15 @@ void*viewer(void*)
 }
 
 atomic<int> totalsamples;
-const int block_size = 1;
+const int block_size = 10;
 void sampler(int blockx, int blocky)
 {
 	int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
 	auto tasks = (Task(*)[yres])taskp;
 	auto samples = (vector<vector3>(*)[yres])samplep;
 	auto image = (vector3(*)[yres])imagep;
+
+	cout << "sampler: " << blockx << " " << blocky << endl;
 
 	for (int y=blocky; y<yres && y < blocky+block_size; y++)
 	{
@@ -144,7 +147,7 @@ void sampler(int blockx, int blocky)
 			{
 				samples[x][y].push_back({111,111,111});
 				tasks[x][y].count--;
-				cout << "sampler: " << x << " " << y << " " << sampleindex << endl;
+				//cout << "sampler: " << x << " " << y << " " << sampleindex << endl;
 				totalsamples++;
 			}
 			image[x][y] = clamp(samples[x][y].back());
@@ -313,15 +316,13 @@ int main(int argc, char **argv)
 			for (int y=0; y<yresolution; y++)
 				for (int x=0; x<xresolution; x++)
 				{
-					if (tasks[x][y].count)
+					if (tasks[x][y].count && !tasks[x][y].assigned)
 					{
-						for (int blockx=x; blockx<xresolution && blockx < x+block_size; blockx++)
-							for (int blocky=y; blocky<yresolution && blocky < y+block_size; blocky++)
-								tasks[blockx][blocky].assigned = true;
-						sampler(x, y);
-						for (int blockx=x; blockx<xresolution && blockx < x+block_size; blockx++)
-							for (int blocky=y; blocky<yresolution && blocky < y+block_size; blocky++)
-								tasks[blockx][blocky].assigned = false;
+						for (int bx=x; bx<x+block_size && bx<xresolution; bx++)
+							for (int by=y; by<y+block_size && by<yresolution; by++)
+								tasks[bx][by].assigned = true;
+						std::thread t(sampler, x, y);
+						t.detach();
 					}
 				}
 		}
