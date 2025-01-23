@@ -356,7 +356,7 @@ int main(int argc, char **argv)
 			for (int y=0; y<yresolution; y++)
 				for (int x=0; x<xresolution; x++)
 				{
-					if (tasks[x][y].count && !tasks[x][y].assigned)
+					if (!tasks[x][y].assigned && tasks[x][y].count)
 					{
 						for (int bx=x; bx<x+block_size && bx<xresolution; bx++)
 							for (int by=y; by<y+block_size && by<yresolution; by++)
