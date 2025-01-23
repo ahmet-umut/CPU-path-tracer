@@ -34,7 +34,6 @@ matrix parse_transformation(xmlNode *node, Tempor&tempor)
                     cerr << "Invalid transformation type: " << type << endl;
                     return transformation;
             }
-
 			transformation = tempor.transformations[indice][id - 1] * transformation;
         }
     }

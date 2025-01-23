@@ -153,11 +153,14 @@ Mesh::Mesh(xmlNode*node, Tempor&tempor, vector<Mesh>&meshes)	//mesh instance
 	data = meshes[mesh_index].data;
 
 	const char* resetTransform = (const char*)xmlGetProp(node, (const xmlChar *)"resetTransform");
+
+	auto newtransformation = matrix::identity();
+/* 
 	if (resetTransform && string(resetTransform) == "true")
 		transformation = matrix::identity();
 	else
 		//cout << "resetTransform not true" << endl,
-		transformation = meshes[mesh_index].transformation;
+		transformation = meshes[mesh_index].transformation; */
 
 	xmlNode *cur_node = NULL;
     for (cur_node = node->children; cur_node; cur_node = cur_node->next) {
@@ -173,9 +176,15 @@ Mesh::Mesh(xmlNode*node, Tempor&tempor, vector<Mesh>&meshes)	//mesh instance
 			else if (match(cur_node, "Transformations"))
 			{
 				auto t = parse_transformation(cur_node, tempor);
-				transformation = t * transformation;
+				newtransformation = t * newtransformation;
 			}
         }
     }
+	if (resetTransform && string(resetTransform) == "true")
+		transformation = newtransformation;
+	else
+		transformation = newtransformation * meshes[mesh_index].transformation;
+	inverse = transformation;	inverse.invert();
+	transpose = inverse;	transpose.transpose();
 	//cout << "mesh transformations" << endl << transformation << endl;
 }

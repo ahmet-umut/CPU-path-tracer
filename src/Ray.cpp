@@ -134,8 +134,7 @@ struct Intersection Ray::intersect(Triangle& triangle)
 }
 static vector3 transform(const matrix& m, vector3 v, bool position=true)
 {
-	if (m.is_identity())
-		return v;
+	if (m.is_identity())	return v;
 	vector4 v4 = v;	v4.x3=position;
 	v4 *= m;
 	//v4 = m * v4;
@@ -276,7 +275,7 @@ struct Intersection Ray::intersect(AlignedBox& box, bool verbose, int debug, int
 	float t5 = (z1 - start.z) / dir.z;
 	float t6 = (z2 - start.z) / dir.z;
 	
-	#define handle(t) {cout << "t1 is nan" << endl; return {false};}
+	#define handle(t) {/* cout << "tx is nan" << endl; */ return {false};}
 	if (t1 != t1)	handle(t1);
 	if (t2 != t2)	handle(t2);
 	if (t3 != t3)	handle(t3);
