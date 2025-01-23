@@ -87,7 +87,7 @@ bool handle_events(Scene&scene, Xsystem&xsystem, void*imagepointer)
 					//saveToPNG(imagepointer, xresolution, yresolution, "png/" + scene.current_camera->image_name);
 					break;
 
-				case 0x19:	//P key
+				case 0x21:	//P key
 					saveToPNG(imagepointer, xresolution, yresolution, "png/" + scene.current_camera->image_name);
 					break;
 				case 43:	// H key

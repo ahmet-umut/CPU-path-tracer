@@ -32,9 +32,9 @@ void applyHDRTonemapping(Xsystem xsystem, int xresolution, int yresolution, void
 		lwhite = luminances[lrint((xresolution * yresolution * (100-xsystem.camera.burn_percent)) / 100)];
 	cout << "HDR.lwhite: " << lwhite << endl;
 
-	for (unsigned int y = 0; y < yresolution; y++)
-		for (unsigned int x = 0; x < xresolution; x++)
-			lw += log(1e-10 + luminance(image[x][y]));
+	#define delta 1e0
+	for (auto&luminance:luminances)
+		lw += log(delta + luminance);
 	cout << "HDR.lw.0: sum of log(1e-9 + luminance(image[x][y])): " << lw << endl;
 
 	lw = exp(lw / (xresolution * yresolution)); 

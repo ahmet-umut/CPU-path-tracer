@@ -71,7 +71,7 @@ void*estimate(void*)
 		float a = (float)(time1*x2/x1 - time2).count() / (1 - exp(x2) - x2/x1 + exp(x1)*x2/x1);
 		float b = (time2.count() - a * (1 - exp(x2))) / x2;
 
-		cout << "estimated time of rendering the view: " << timeof(a * (1 - exp(1)) + b) << "                  \r" << flush;
+		cout << "estimated remaining/total time: " << timeof(a * (1 - exp(1)) + b - time2.count()) << " / " << timeof(a * (1 - exp(1)) + b) << "  \r" << flush;
 		if (timeoverflow)
 		{
 			//cout << endl << "estimator debug: a = " << a << " b = " << b << " x1 = " << x1 << " x2 = " << x2 << " time1 = " << time1.count() << " time2 = " << time2.count();
