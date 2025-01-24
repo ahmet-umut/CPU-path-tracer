@@ -398,15 +398,38 @@ int main(int argc, char **argv)
 			//cout << "totalsamples: " << (int)totalsamples << " pendingsamples: " << pendingsamples << " " << endl;
 
 			#pragma omp parallel for
-			for (int y=0; y<yresolution; y++)
-				for (int x=0; x<xresolution; x++)
+			for (int y=0; y<yresolution; y+=block_size)
+				for (int x=0; x<xresolution; x+=block_size)
 				{
 					if (!tasks[x][y].assigned && tasks[x][y].count)
 					{
-						for (int bx=x; bx<x+block_size && bx<xresolution; bx++)
-							for (int by=y; by<y+block_size && by<yresolution; by++)
-								tasks[bx][by].assigned = true;
-						sampler(x, y);
+						int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
+						auto tasks = (Task(*)[yres])taskp;
+						auto samples = (vector<vector3>(*)[yres])samplep;
+						auto image = (vector3(*)[yres])imagep;
+						//auto hdrimage = (vector3(*)[yres])hdrimagep;
+
+						//cout << "sampler: " << blockx << " " << blocky << endl;
+
+						for (int by=y; by<yres && by < y+block_size; by++)
+						{
+							for (int bx=x; bx<xres && bx < x+block_size; bx++)
+							{
+								for (int sampleindex=0; sampleindex<tasks[bx][by].count; sampleindex++)
+								{
+									samples[bx][by].push_back(sample(bx, by));
+									tasks[bx][by].count--;
+									//cout << "sampler: " << bx << " " << y << " " << sampleindex << endl;
+									totalsamples++;
+								}
+								vector3 color={0,0,0};
+								for (auto&sample:samples[bx][by])
+									color += sample;
+								color = color / samples[bx][by].size();
+								image[bx][by] = clamp(color);
+								xsystem.imagedata[by*xres+bx] = (int)image[bx][by].x << 16 | (int)image[bx][by].y << 8 | (int)image[bx][by].z;
+							}
+						}
 					}
 				}
 
