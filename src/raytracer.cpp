@@ -61,37 +61,8 @@ int pendingsamples=0;
 volatile bool running = false;
 std::chrono::_V2::system_clock::time_point t0, t1;
 std::atomic<int> counter;	int max_count;
-void*estimate(void*)
-{
-	counter = 0;
-	while (running)
-	{
-		sleep(1);	if (!running)	break;
-		float x1 = (float)totalsamples / max_count;
-		auto time1 = std::chrono::high_resolution_clock::now() - t0;
-		sleep(1);	if (!running)	break;
-		float x2 = (float)totalsamples / max_count;
-		auto time2 = std::chrono::high_resolution_clock::now() - t0;
-		
-		//t = a(1-e^x) + b
-		float dx = x2 - x1;
-		float a = (float)(time1*x2/x1 - time2).count() / (1 - exp(x2) - x2/x1 + exp(x1)*x2/x1);
-		float b = (time2.count() - a * (1 - exp(x2))) / x2;
 
-		cout << "estimated remaining/total time: " << timeof(a * (1 - exp(1)) + b - time2.count()) << " / " << timeof(a * (1 - exp(1)) + b)
-			<< " pending samples: " << pendingsamples
-			<< "  \r" << flush;
-		if (timeoverflow)
-		{
-			//cout << endl << "estimator debug: a = " << a << " b = " << b << " x1 = " << x1 << " x2 = " << x2 << " time1 = " << time1.count() << " time2 = " << time2.count();
-			//cout << flush << "\e[A\r";
-		}
-	}
-	cout << endl;
-	return nullptr;
-}
-
-void *imagep, *hdrimagep;
+void *sdrimagep, *hdrimagep;
 
 volatile bool last_event = false;
 void*event_handler(void*)
@@ -99,7 +70,7 @@ void*event_handler(void*)
 	while (running)
 	{
 		usleep(100000/6);	if (!running)	break;
-		last_event = handle_events(scene, xsystem, imagep);
+		last_event = handle_events(scene, xsystem, sdrimagep, hdrimagep);
 	}
 	return nullptr;
 }
@@ -158,6 +129,7 @@ void*task_creator(void*)
 
 void*viewer(void*)
 {
+	int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
 	while (running)
 	{
 		if (xsystem.handles[0])
@@ -165,10 +137,14 @@ void*viewer(void*)
 			sleep(1);	if (!running)	break;
 			continue;
 		}
-		usleep(40000);	if (!running)	break;
-		XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, scene.current_camera->image_resolution[0], scene.current_camera->image_resolution[1]);
+		usleep(100000);	if (!running)	break;
+		if (scene.current_camera->hdr)
+			applyHDRTonemapping(xsystem, xres, yres, hdrimagep, sdrimagep);
+		XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, xres, yres);
 	}
-	XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, scene.current_camera->image_resolution[0], scene.current_camera->image_resolution[1]);
+	if (scene.current_camera->hdr)
+		applyHDRTonemapping(xsystem, xres, yres, hdrimagep, sdrimagep);
+	XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, xres, yres);
 	return nullptr;
 }
 
@@ -205,7 +181,7 @@ void sampler(int blockx, int blocky)
 	int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
 	auto tasks = (Task(*)[yres])taskp;
 	auto samples = (vector<vector3>(*)[yres])samplep;
-	auto image = (vector3(*)[yres])imagep;
+	auto image = (vector3(*)[yres])sdrimagep;
 	//auto hdrimage = (vector3(*)[yres])hdrimagep;
 
 	//cout << "sampler: " << blockx << " " << blocky << endl;
@@ -235,6 +211,36 @@ void sampler(int blockx, int blocky)
 			tasks[x][y].assigned = false;
 };
 
+void*estimate(void*)
+{
+	counter = 0;
+	while (running)
+	{
+		sleep(1);	if (!running)	break;
+		float x1 = (float)totalsamples / max_count;
+		auto time1 = std::chrono::high_resolution_clock::now() - t0;
+		sleep(1);	if (!running)	break;
+		float x2 = (float)totalsamples / max_count;
+		auto time2 = std::chrono::high_resolution_clock::now() - t0;
+		
+		//t = a(1-e^x) + b
+		float dx = x2 - x1;
+		float a = (float)(time1*x2/x1 - time2).count() / (1 - exp(x2) - x2/x1 + exp(x1)*x2/x1);
+		float b = (time2.count() - a * (1 - exp(x2))) / x2;
+
+		cout << "estimated remaining/total time: " << timeof(a * (1 - exp(1)) + b - time2.count()) << " / " << timeof(a * (1 - exp(1)) + b)
+			<< " pending samples: " << pendingsamples
+			<< "  \r" << flush;
+		if (timeoverflow)
+		{
+			//cout << endl << "estimator debug: a = " << a << " b = " << b << " x1 = " << x1 << " x2 = " << x2 << " time1 = " << time1.count() << " time2 = " << time2.count();
+			//cout << flush << "\e[A\r";
+		}
+	}
+	cout << endl;
+	return nullptr;
+}
+
 int main(int argc, char **argv)
 {
 	unsigned int camera_index=-1;
@@ -253,7 +259,7 @@ int main(int argc, char **argv)
 	}
 
 	// set stack size to 33MB
-	const rlim_t kStackSize = 33 * 1024 * 1024;   
+	const rlim_t kStackSize = 99 * 1024 * 1024;   
     struct rlimit rl;
     int result;
     result = getrlimit(RLIMIT_STACK, &rl);
@@ -332,7 +338,7 @@ int main(int argc, char **argv)
 
 		#ifdef _xdebug
 		usleep(100000/6);
-		switch (handle_events(scene, xsystem, imagep))
+		switch (handle_events(scene, xsystem, sdrimagep, hdrimagep))
 		{
 		case true:
 			break;
@@ -371,7 +377,8 @@ int main(int argc, char **argv)
 		// TODO: define camera variables such as screen_center, right, up, deep, resolution, etc.
 		#endif
 
-		vector3 image[xresolution][yresolution];	imagep = image;
+		vector3 sdrimage[xresolution][yresolution];	sdrimagep = sdrimage;
+		vector3 hdrimage[xresolution][yresolution];	hdrimagep = hdrimage;
 		Task tasks[xresolution][yresolution];	taskp = tasks;
 		vector<vector3> samples[xresolution][yresolution];	samplep = samples;
 
@@ -385,6 +392,8 @@ int main(int argc, char **argv)
 		pthread_t event_thread;	pthread_create(&event_thread, nullptr, event_handler, nullptr);	pthread_detach(event_thread);
 		//pthread_t task_thread;	pthread_create(&task_thread, nullptr, task_creator, nullptr);	pthread_detach(task_thread);
 		pthread_t viewer_thread;	pthread_create(&viewer_thread, nullptr, viewer, nullptr);	pthread_detach(viewer_thread);
+
+		cout << "Rendering " << xresolution << "x" << yresolution << " image with " << camera.sample_count << " samples per pixel" << endl;
 
 		float multiplier=1;	if (camera.pathtracing)	multiplier = 2 * M_PI;
 
@@ -404,7 +413,7 @@ int main(int argc, char **argv)
 					int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
 					auto tasks = (Task(*)[yres])taskp;
 					auto samples = (vector<vector3>(*)[yres])samplep;
-					auto image = (vector3(*)[yres])imagep;
+					auto image = (vector3(*)[yres])sdrimagep;
 
 					for (int by=y; by<yres && by < y+block_size; by++)
 					{
@@ -420,8 +429,13 @@ int main(int argc, char **argv)
 							for (auto&sample:samples[bx][by])
 								color += sample;
 							color = color / samples[bx][by].size();
-							image[bx][by] = clamp(color);
-							xsystem.imagedata[by*xres+bx] = (int)image[bx][by].x << 16 | (int)image[bx][by].y << 8 | (int)image[bx][by].z;
+							if (!scene.current_camera->hdr)
+							{
+								sdrimage[bx][by] = color = clamp(color),
+								xsystem.imagedata[by*xres+bx] = (int)color.x << 16 | (int)color.y << 8 | (int)color.z;
+							}
+							else
+								hdrimage[bx][by] = color;
 						}
 					}
 				}
@@ -438,7 +452,7 @@ int main(int argc, char **argv)
 					{
 						tasks[x][y].count++;
 						pendingsamples--;
-						if (!xsystem.handles[0])
+						if (xsystem.handles[0])
 						{
 							XSetForeground(display, gc, 0x00FF00);
 							XDrawPoint(display, window, gc, x, y);
@@ -457,7 +471,7 @@ int main(int argc, char **argv)
 			string exr_name = camera.image_name;
 			//saveToEXR(image, xresolution, yresolution, "exr/" + camera.image_name);	//save before tone-mapping
 			//saveToEXR(image, xresolution, yresolution, camera.image_name);	//save before tone-mapping
-			applyHDRTonemapping(xsystem, xresolution, yresolution, image);
+			applyHDRTonemapping(xsystem, xresolution, yresolution, hdrimage, sdrimage);
 			#ifdef _xdebug
 			XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, xresolution, yresolution);
 			#else

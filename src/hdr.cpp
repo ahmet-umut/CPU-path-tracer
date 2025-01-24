@@ -16,9 +16,10 @@ static float luminance(vector3 color)
 	return color.x * 0.2 + color.y * 0.7 + color.z * 0.1;
 }
 
-void applyHDRTonemapping(Xsystem xsystem, int xresolution, int yresolution, void*pointer)
+void applyHDRTonemapping(Xsystem xsystem, int xresolution, int yresolution, void*hdr, void*sdr)
 {
-	auto image = (vector3(*)[yresolution])pointer;
+	auto image = (vector3(*)[yresolution])hdr;
+	auto sdr_image = (vector3(*)[yresolution])sdr;
 	float lw=0;
 
 	float luminances[yresolution*xresolution];
@@ -28,33 +29,14 @@ void applyHDRTonemapping(Xsystem xsystem, int xresolution, int yresolution, void
 			#define delta 1e-0
 			lw += log(luminances[y * xresolution + x] + delta) / xresolution / yresolution;
 	std::sort(luminances, luminances + xresolution * yresolution);
-	cout << "HDR.lw.0: " << lw << endl;
+	//cout << "HDR.lw.0: " << lw << endl;
 	lw = exp(lw);
-	cout << "HDR.lw.1: " << lw << endl;
+	//cout << "HDR.lw.1: " << lw << endl;
 
 	float lwhite=INFINITY;
 	//if (xsystem.camera.burn_percent)
 		lwhite = luminances[lrint((xresolution * yresolution * (100-xsystem.camera.burn_percent)) / 100)];
-	cout << "HDR.lwhite: " << lwhite << endl;
-
-	/* for (auto&luminance:luminances)
-	{
-		static bool okay=true;
-		if (luminance <= 0)	;
-		else	lw += log(luminance) / xresolution / yresolution;
-		if (lw==lw)	cout << "lw: " << lw << " luminance: " << luminance << "  \r";
-		else if (okay)
-		{
-			cout<<endl;
-			cout << "lw is nan" << endl;
-			cout << "lw: " << lw << " luminance: " << luminance << endl;
-			okay=false;
-		}
-	}
-	cout <<endl;
-	cout << "HDR.lw.0: sum of log(1e-9 + luminance(image[x][y])): " << lw << endl;
-	lw = exp(lw);
-	cout << "HDR.lw.1: exp(lw.0 / (xresolution * yresolution)): " << lw << endl; */
+	//cout << "HDR.lwhite: " << lwhite << endl;
 
 	for (unsigned int y = 0; y < yresolution; y++)
 		for (unsigned int x = 0; x < xresolution; x++)
@@ -74,6 +56,6 @@ void applyHDRTonemapping(Xsystem xsystem, int xresolution, int yresolution, void
 			#ifdef _xdebug
 			xsystem.imagedata[y * xresolution + x] = ((unsigned int)color.x<<16) + ((unsigned int)color.y<<8) + (unsigned int)color.z;
 			#endif
-			image[x][y] = color;
+			sdr_image[x][y] = color;
 		}
 }
