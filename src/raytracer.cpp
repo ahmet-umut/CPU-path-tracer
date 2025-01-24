@@ -160,7 +160,8 @@ void*viewer(void*)
 {
 	while (running)
 	{
-		usleep(40000);	if (!running)	break;
+		sleep(1);
+		if (!running)	break;
 		XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, scene.current_camera->image_resolution[0], scene.current_camera->image_resolution[1]);
 	}
 	XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, scene.current_camera->image_resolution[0], scene.current_camera->image_resolution[1]);
@@ -383,58 +384,44 @@ int main(int argc, char **argv)
 
 		float multiplier=1;	if (camera.pathtracing)	multiplier = 2 * M_PI;
 
-			//int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
-			//auto tasks = (Task(*)[yres])taskp;
-			//auto samples = (vector<vector3>(*)[yres])samplep;
-			//tasks.reserve(xresolution * yresolution);
-			for (unsigned int y = 0; y < scene.current_camera->image_resolution[1]; y++)
-				for (unsigned int x = 0; x < scene.current_camera->image_resolution[0]; x++)
-					tasks[x][y].count=2, tasks[x][y].assigned=false;
-			pendingsamples = xres * yres * (scene.current_camera->sample_count-2);
+		for (unsigned int y = 0; y < scene.current_camera->image_resolution[1]; y++)
+			for (unsigned int x = 0; x < scene.current_camera->image_resolution[0]; x++)
+				tasks[x][y].count=2, tasks[x][y].assigned=false;
+		pendingsamples = xres * yres * (scene.current_camera->sample_count-2);
 
 		totalsamples=0;
 		while (totalsamples < camera.sample_count*xresolution*yresolution)
 		{
 			//cout << "totalsamples: " << (int)totalsamples << " pendingsamples: " << pendingsamples << " " << endl;
-
 			#pragma omp parallel for
 			for (int y=0; y<yresolution; y+=block_size)
 				for (int x=0; x<xresolution; x+=block_size)
 				{
-					if (!tasks[x][y].assigned && tasks[x][y].count)
+					int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
+					auto tasks = (Task(*)[yres])taskp;
+					auto samples = (vector<vector3>(*)[yres])samplep;
+					auto image = (vector3(*)[yres])imagep;
+
+					for (int by=y; by<yres && by < y+block_size; by++)
 					{
-						int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
-						auto tasks = (Task(*)[yres])taskp;
-						auto samples = (vector<vector3>(*)[yres])samplep;
-						auto image = (vector3(*)[yres])imagep;
-						//auto hdrimage = (vector3(*)[yres])hdrimagep;
-
-						//cout << "sampler: " << blockx << " " << blocky << endl;
-
-						for (int by=y; by<yres && by < y+block_size; by++)
+						for (int bx=x; bx<xres && bx < x+block_size; bx++)
 						{
-							for (int bx=x; bx<xres && bx < x+block_size; bx++)
+							for (int sampleindex=0; sampleindex<tasks[bx][by].count; sampleindex++)
 							{
-								for (int sampleindex=0; sampleindex<tasks[bx][by].count; sampleindex++)
-								{
-									samples[bx][by].push_back(sample(bx, by));
-									tasks[bx][by].count--;
-									//cout << "sampler: " << bx << " " << y << " " << sampleindex << endl;
-									totalsamples++;
-								}
-								vector3 color={0,0,0};
-								for (auto&sample:samples[bx][by])
-									color += sample;
-								color = color / samples[bx][by].size();
-								image[bx][by] = clamp(color);
-								xsystem.imagedata[by*xres+bx] = (int)image[bx][by].x << 16 | (int)image[bx][by].y << 8 | (int)image[bx][by].z;
+								samples[bx][by].push_back(sample(bx, by));
+								tasks[bx][by].count--;
+								totalsamples++;
 							}
+							vector3 color={0,0,0};
+							for (auto&sample:samples[bx][by])
+								color += sample;
+							color = color / samples[bx][by].size();
+							image[bx][by] = clamp(color);
+							xsystem.imagedata[by*xres+bx] = (int)image[bx][by].x << 16 | (int)image[bx][by].y << 8 | (int)image[bx][by].z;
 						}
 					}
 				}
 
-			struct Block {int x=0,y=0; float entropy=-INFINITY;}  max_block;
-			int window_size = 100;
 			float entropies[xres][yres];
 			float mean_entropy=0;
 			for (int y=0; y<yres; y++)
@@ -443,9 +430,13 @@ int main(int argc, char **argv)
 			mean_entropy /= xres*yres;
 			for (int y=0; y<yres; y++)
 				for (int x=0; x<xres; x++)
-					if (!tasks[x][y].assigned && entropies[x][y] > mean_entropy)
-						tasks[x][y].count++,
+					if (entropies[x][y] > mean_entropy)
+					{
+						tasks[x][y].count++;
 						pendingsamples--;
+						XSetForeground(display, gc, 0x00FF00);
+						XDrawPoint(display, window, gc, x, y);
+					}
 		}
 		
 		running = false;
