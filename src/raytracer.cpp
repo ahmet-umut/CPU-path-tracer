@@ -395,6 +395,10 @@ int main(int argc, char **argv)
 		Task tasks[xresolution][yresolution];	taskp = tasks;
 		vector<vector3> samples[xresolution][yresolution];	samplep = samples;
 
+		//first make the background for Xwindow gray
+		XSetForeground(display, gc, 0x808080);
+		XFillRectangle(display, window, gc, 0, 0, xresolution, yresolution);
+		
 		cout << "--- Rendering Started : " << camera.image_name << " ---" << endl;
 		
 		running = true;
@@ -467,18 +471,24 @@ int main(int argc, char **argv)
 			mean_entropy = mean_entropy / xres / yres;
 			
 			//cout << "mean entropy: " << mean_entropy << endl;
-			for (int y=0; y<yres; y++)
-				for (int x=0; x<xres; x++)
+			for (int x=0; x<xres; x++)
+				for (int y=0; y<yres; y++)
 					if (entropies[x][y] > mean_entropy)
 					{
 						int count = round(entropies[x][y] / mean_entropy);
 						tasks[x][y].count += count;
-						//tasks[x][y].count += 1;
 						pendingsamples-=count;
-						if (xsystem.handles[0])
+						
+						if (y-1 >= 0)	tasks[x][y-1].count++, pendingsamples--;
+						if (y+1 < yres)	tasks[x][y+1].count++, pendingsamples--;
+						if (x-1 >= 0)	tasks[x-1][y].count++, pendingsamples--;
+						if (x+1 < xres)	tasks[x+1][y].count++, pendingsamples--;
+
+						if (xsystem.handles[0])	//show where is being sampled
 						{
 							XSetForeground(display, gc, 0x00FF00);
-							XDrawPoint(display, window, gc, x, y);
+							XDrawLine(display, window, gc, x-1, y, x+1, y);
+							XDrawLine(display, window, gc, x, y-1, x, y+1);
 						}
 					}
 		}
