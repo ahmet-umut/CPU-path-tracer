@@ -50,9 +50,13 @@ void xcleanup(Display*& display, Window& window, GC& gc)
 	XCloseDisplay(display);
 }
 
-/* #include <X11/Xutil.h>
+#include <X11/Xutil.h>
 void drawpoint(Display* display, Window window, GC gc, int x, int y, vector4 color)
 {
 	auto ximage = XGetImage(display, window, x, y, 1, 1, AllPlanes, ZPixmap);
-	vector4
-} */
+	vector4 current_color;
+	auto pixel = XGetPixel(ximage, 0, 0);
+	current_color.x = pixel >> 16 & 0xFF;
+	current_color.y = pixel >> 8 & 0xFF;
+	current_color.z = pixel & 0xFF;
+}
