@@ -77,7 +77,7 @@ void*event_handler(void*)
 
 struct Task
 {
-	std::atomic_int count;	bool assigned=false;
+	int count;	bool assigned=false;
 };
 void*samplep=nullptr;
 void*taskp=nullptr;
@@ -408,10 +408,11 @@ int main(int argc, char **argv)
 
 		float multiplier=1;	if (camera.pathtracing)	multiplier = 2 * M_PI;
 
+		int spp0 = xsystem.handles[1] ? camera.sample_count:2;
 		for (unsigned int y = 0; y < scene.current_camera->image_resolution[1]; y++)
 			for (unsigned int x = 0; x < scene.current_camera->image_resolution[0]; x++)
-				tasks[x][y].count=2, tasks[x][y].assigned=false;
-		pendingsamples = xres * yres * (scene.current_camera->sample_count-2);
+				tasks[x][y].count=spp0;
+		pendingsamples = xres * yres * (camera.sample_count-spp0);
 
 		totalsamples=0;
 		while (totalsamples < camera.sample_count*xresolution*yresolution)
@@ -430,7 +431,7 @@ int main(int argc, char **argv)
 					{
 						for (int bx=x; bx<xres && bx < x+block_size; bx++)
 						{
-							for (int sampleindex=0; sampleindex<tasks[bx][by].count; sampleindex++)
+							while (tasks[bx][by].count)
 							{
 								samples[bx][by].push_back(sample(bx, by));
 								tasks[bx][by].count--;
@@ -450,6 +451,7 @@ int main(int argc, char **argv)
 						}
 					}
 				}
+			if (totalsamples >= camera.sample_count*xresolution*yresolution)	break;
 
 			float entropies[xres][yres];
 			atomic<float> mean_entropy=0;

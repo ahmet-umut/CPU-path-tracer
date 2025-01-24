@@ -17,7 +17,7 @@ set(disabled_warnings "-Wno-narrowing -Wno-unused-result")
 
 # Enable debugging symbols and disable narrowing warnings
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${disabled_warnings} -fopenmp -march=native -g")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -march=native -g -fmodulo-sched")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -march=native -g")
 
 # Find required libraries
 find_package(X11 REQUIRED)

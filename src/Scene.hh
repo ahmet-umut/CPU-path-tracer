@@ -16,7 +16,7 @@ struct Camera
 	float near_plane[4], near_distance;
 	uint16_t image_resolution[2];
 	std::string image_name;
-	unsigned char sample_count=1;
+	int sample_count=1;
 	float focus_distance=0, aperture_size=0;
 	bool hdr=false, pathtracing=false, nee=false, importance_sampling=false;
 	float key_value, burn_percent, saturation, gamma;
