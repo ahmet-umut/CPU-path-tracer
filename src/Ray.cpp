@@ -160,7 +160,7 @@ struct Intersection Ray::intersect(Sphere& sphere, bool transformed)
 		LAPACKE_sgetrf(LAPACK_ROW_MAJOR, 4, 4, (float*)&inverse, 4, ipiv);
 		LAPACKE_sgetri(LAPACK_ROW_MAJOR, 4, (float*)&inverse, 4, ipiv); */
 
-		Ray ray = {transform(sphere.inverse, start), transform(sphere.inverse, getdirection(),false)};
+		Ray ray = {transform(sphere.inverse, start), transform(sphere.inverse, getdirection(), false)};
 		//ray = *this;
 
 		struct Intersection intersection = ray.intersect(sphere,true);

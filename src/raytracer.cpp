@@ -85,13 +85,26 @@ void*taskp=nullptr;
 float calculate_entropy(vector<vector3> samples)
 {
 	vector3 mean={0,0,0};
+	int n = samples.size();
 	for (auto&sample:samples)
 		mean += sample;
-	mean = mean / samples.size();
+	mean = mean / n;
 	float entropy=0;
 	for (auto&sample:samples)
 		entropy += norm(sample - mean);
-	entropy /= samples.size()*samples.size();
+	entropy /= (n-1)*(n-1);
+	//cout << "entropy: " << entropy << endl;
+	return entropy;
+}
+float _calculate_entropy(vector<vector3> samples)
+{
+	
+	float entropy=0;
+	for (auto&sample1:samples)
+		for (auto&sample2:samples)
+			entropy += norm(sample1 - sample2);
+	int n = samples.size();
+	entropy /= pow(n*(n-1)/2, 2);
 	return entropy;
 }
 
@@ -132,19 +145,17 @@ void*viewer(void*)
 	int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
 	while (running)
 	{
-		if (xsystem.handles[0])
+		if (xsystem.handles[0])	//meaning that we do not need to display the image until handle0 is off
 		{
 			sleep(1);	if (!running)	break;
 			continue;
 		}
-		usleep(100000);	if (!running)	break;
-		if (scene.current_camera->hdr)
-			applyHDRTonemapping(xsystem, xres, yres, hdrimagep, sdrimagep);
-		XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, xres, yres);
+		usleep(1e5);	if (!running)	break;
+		if (!scene.current_camera->hdr)
+			XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, xres, yres);
 	}
-	if (scene.current_camera->hdr)
-		applyHDRTonemapping(xsystem, xres, yres, hdrimagep, sdrimagep);
-	XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, xres, yres);
+	if (!scene.current_camera->hdr)
+		XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, xres, yres);
 	return nullptr;
 }
 
@@ -228,8 +239,8 @@ void*estimate(void*)
 		float a = (float)(time1*x2/x1 - time2).count() / (1 - exp(x2) - x2/x1 + exp(x1)*x2/x1);
 		float b = (time2.count() - a * (1 - exp(x2))) / x2;
 
-		cout << "estimated remaining/total time: " << timeof(a * (1 - exp(1)) + b - time2.count()) << " / " << timeof(a * (1 - exp(1)) + b)
-			<< " pending samples: " << pendingsamples
+		//cout << "estimated remaining/total time: " << timeof(a * (1 - exp(1)) + b - time2.count()) << " / " << timeof(a * (1 - exp(1)) + b)
+			cout << "pending samples: " << pendingsamples
 			<< "  \r" << flush;
 		if (timeoverflow)
 		{
@@ -440,18 +451,24 @@ int main(int argc, char **argv)
 					}
 				}
 
+			
 			float entropies[xres][yres];
-			float mean_entropy=0;
+			atomic<float> mean_entropy=0;
+			#pragma omp parallel for
 			for (int y=0; y<yres; y++)
 				for (int x=0; x<xres; x++) if (!tasks[x][y].assigned)
 					mean_entropy += entropies[x][y] = calculate_entropy(samples[x][y]);
-			mean_entropy /= xres*yres;
+			mean_entropy = mean_entropy / xres / yres;
+			
+			//cout << "mean entropy: " << mean_entropy << endl;
 			for (int y=0; y<yres; y++)
 				for (int x=0; x<xres; x++)
 					if (entropies[x][y] > mean_entropy)
 					{
-						tasks[x][y].count++;
-						pendingsamples--;
+						int count = round(entropies[x][y] / mean_entropy);
+						tasks[x][y].count += count;
+						//tasks[x][y].count += 1;
+						pendingsamples-=count;
 						if (xsystem.handles[0])
 						{
 							XSetForeground(display, gc, 0x00FF00);

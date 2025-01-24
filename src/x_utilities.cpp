@@ -49,3 +49,10 @@ void xcleanup(Display*& display, Window& window, GC& gc)
 	// Close the connection to the X server
 	XCloseDisplay(display);
 }
+
+/* #include <X11/Xutil.h>
+void drawpoint(Display* display, Window window, GC gc, int x, int y, vector4 color)
+{
+	auto ximage = XGetImage(display, window, x, y, 1, 1, AllPlanes, ZPixmap);
+	vector4
+} */
