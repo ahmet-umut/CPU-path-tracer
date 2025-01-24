@@ -454,11 +454,14 @@ int main(int argc, char **argv)
 			if (totalsamples >= camera.sample_count*xresolution*yresolution)	break;
 
 			float entropies[xres][yres];
-			atomic<float> mean_entropy=0;
 			#pragma omp parallel for
 			for (int y=0; y<yres; y++)
 				for (int x=0; x<xres; x++) if (!tasks[x][y].assigned)
-					mean_entropy += entropies[x][y] = calculate_entropy(samples[x][y]);
+					entropies[x][y] = calculate_entropy(samples[x][y]);
+			float mean_entropy=0;
+			for (int x=0; x<xres; x++)
+				for (int y=0; y<yres; y++)
+					mean_entropy += entropies[x][y];
 			mean_entropy = mean_entropy / xres / yres;
 			
 			//cout << "mean entropy: " << mean_entropy << endl;
