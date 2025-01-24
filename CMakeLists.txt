@@ -16,8 +16,8 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 set(disabled_warnings "-Wno-narrowing -Wno-unused-result")
 
 # Enable debugging symbols and disable narrowing warnings
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${disabled_warnings} -fopenmp -O3 -march=native -g")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${disabled_warnings} -fopenmp -march=native -g")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -march=native -g -fmodulo-sched")
 
 # Find required libraries
 find_package(X11 REQUIRED)
@@ -25,7 +25,6 @@ find_package(LibXml2 REQUIRED)
 find_package(PNG REQUIRED)  # Find libpng
 find_package(JPEG REQUIRED)  # Find libjpeg
 find_package(OpenEXR REQUIRED)  # Find OpenEXR
-
 
 # Check for OpenEXR and include its directories
 if (OpenEXR_FOUND)
