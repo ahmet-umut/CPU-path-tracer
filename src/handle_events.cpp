@@ -93,6 +93,9 @@ bool handle_events(Scene&scene, Xsystem&xsystem, void*imagepointer)
 				case 43:	// H key
 					//sa
 					break;
+				case 10 ... 19:
+					xsystem.handles[event.xkey.keycode-10] = !xsystem.handles[event.xkey.keycode-10];
+					break;
 				}
                 break;
             }

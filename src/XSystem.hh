@@ -20,6 +20,8 @@ struct Xsystem
 	bool triangle_debug=false;
 	bool box_debug=false;
 
+	bool handles[10]={};
+
 	vector<vector3> mirror_path;
 	Path tree;
 };

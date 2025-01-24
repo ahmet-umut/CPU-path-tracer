@@ -160,8 +160,12 @@ void*viewer(void*)
 {
 	while (running)
 	{
-		sleep(1);
-		if (!running)	break;
+		if (xsystem.handles[0])
+		{
+			sleep(1);	if (!running)	break;
+			continue;
+		}
+		usleep(40000);	if (!running)	break;
 		XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, scene.current_camera->image_resolution[0], scene.current_camera->image_resolution[1]);
 	}
 	XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, scene.current_camera->image_resolution[0], scene.current_camera->image_resolution[1]);
@@ -434,8 +438,11 @@ int main(int argc, char **argv)
 					{
 						tasks[x][y].count++;
 						pendingsamples--;
-						XSetForeground(display, gc, 0x00FF00);
-						XDrawPoint(display, window, gc, x, y);
+						if (!xsystem.handles[0])
+						{
+							XSetForeground(display, gc, 0x00FF00);
+							XDrawPoint(display, window, gc, x, y);
+						}
 					}
 		}
 		
