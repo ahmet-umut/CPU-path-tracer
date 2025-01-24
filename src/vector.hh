@@ -20,8 +20,7 @@ struct vector4
 	vector4(float x, float y, float z) : x(x), y(y), z(z) {}
 	float&operator[](const int i) const {return ((float*)this)[i];}
 	void operator*= (const matrix&m);
-	bool operator==(const vector4& v) const
-		{return x == v.x && y == v.y && z == v.z && x3 == v.x3;}
+	bool operator==(const vector4& v) const	{return x == v.x && y == v.y && z == v.z && x3 == v.x3;}
 };
 struct vector3
 {
@@ -38,14 +37,10 @@ struct vector3
 	vector3 operator/(float f) const {return *this * (1/f);}
 	vector3 operator-() const {return *this * -1;}
 	vector3 operator-(const vector3& v) const;
-	bool operator==(const vector3& v) const
-		{return x == v.x && y == v.y && z == v.z;}
+	bool operator==(const vector3& v) const	{return x == v.x && y == v.y && z == v.z;}
 
 	vector3 cross(const vector3& v) const;
-	vector3 apply(auto f) const
-	{
-		return {f(x), f(y), f(z)};
-	}
+	vector3 apply(auto f) const {return {f(x), f(y), f(z)};}
 	vector3 elementwise(const vector3& v) const {return {x*v.x, y*v.y, z*v.z};}
 	vector3& normalize();
 	vector3 getnormalized() const;
@@ -66,22 +61,3 @@ struct matrix
 	void transpose();
 	bool is_identity() const;
 };
-
-inline vector3 vector3::operator+(const vector3& v) const
-{
-	vector3 result;
-	vsAdd(3, (float*)this, (float*)&v, (float*)&result);
-	return result;
-}
-inline vector3 vector3::operator-(const vector3& v) const
-{
-	vector3 result;
-	vsSub(3, (float*)this, (float*)&v, (float*)&result);
-	return result;
-}
-inline vector4 matrix::operator*(const vector4& v) const
-{
-	vector4 result;
-	cblas_sgemv(CblasRowMajor, CblasNoTrans, 4, 4, 1, (float*)this, 4, (float*)&v, 1, 0, (float*)&result, 1);
-	return result;
-}

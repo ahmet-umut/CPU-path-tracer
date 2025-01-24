@@ -82,3 +82,22 @@ bool matrix::is_identity() const
 {
 	return row0 == vector4{1,0,0,0} && row1 == vector4{0,1,0,0} && row2 == vector4{0,0,1,0} && row3 == vector4{0,0,0,1};
 }
+
+vector3 vector3::operator+(const vector3& v) const
+{
+	vector3 result;
+	vsAdd(3, (float*)this, (float*)&v, (float*)&result);
+	return result;
+}
+vector3 vector3::operator-(const vector3& v) const
+{
+	vector3 result;
+	vsSub(3, (float*)this, (float*)&v, (float*)&result);
+	return result;
+}
+vector4 matrix::operator*(const vector4& v) const
+{
+	vector4 result;
+	cblas_sgemv(CblasRowMajor, CblasNoTrans, 4, 4, 1, (float*)this, 4, (float*)&v, 1, 0, (float*)&result, 1);
+	return result;
+}

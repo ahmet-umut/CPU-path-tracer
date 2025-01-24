@@ -451,7 +451,6 @@ int main(int argc, char **argv)
 					}
 				}
 
-			
 			float entropies[xres][yres];
 			atomic<float> mean_entropy=0;
 			#pragma omp parallel for
