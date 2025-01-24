@@ -88,17 +88,19 @@ float calculate_entropy(vector<vector3> samples)
 	int n = samples.size();
 	for (auto&sample:samples)
 		mean += sample;
-	mean = mean / n;
+	mean = mean / n;	if (!scene.current_camera->hdr)	mean = clamp(mean);
 	float entropy=0;
 	for (auto&sample:samples)
+	{
+		if (!scene.current_camera->hdr)	sample = clamp(sample);
 		entropy += norm(sample - mean);
+	}
 	entropy /= (n-1)*(n-1);
 	//cout << "entropy: " << entropy << endl;
 	return entropy;
 }
 float _calculate_entropy(vector<vector3> samples)
 {
-	
 	float entropy=0;
 	for (auto&sample1:samples)
 		for (auto&sample2:samples)
@@ -402,7 +404,7 @@ int main(int argc, char **argv)
 		pthread_t estimating_thread;	pthread_create(&estimating_thread, nullptr, estimate, nullptr);	pthread_detach(estimating_thread);
 		pthread_t event_thread;	pthread_create(&event_thread, nullptr, event_handler, nullptr);	pthread_detach(event_thread);
 		//pthread_t task_thread;	pthread_create(&task_thread, nullptr, task_creator, nullptr);	pthread_detach(task_thread);
-		pthread_t viewer_thread;	pthread_create(&viewer_thread, nullptr, viewer, nullptr);	pthread_detach(viewer_thread);
+		//pthread_t viewer_thread;	pthread_create(&viewer_thread, nullptr, viewer, nullptr);	pthread_detach(viewer_thread);
 
 		cout << "Rendering " << xresolution << "x" << yresolution << " image with " << camera.sample_count << " samples per pixel" << endl;
 
@@ -437,7 +439,7 @@ int main(int argc, char **argv)
 								tasks[bx][by].count--;
 								totalsamples++;
 							}
-							vector3 color={0,0,0};
+							/* vector3 color={0,0,0};
 							for (auto&sample:samples[bx][by])
 								color += sample;
 							color = color / samples[bx][by].size();
@@ -447,7 +449,7 @@ int main(int argc, char **argv)
 								xsystem.imagedata[by*xres+bx] = (int)color.x << 16 | (int)color.y << 8 | (int)color.z;
 							}
 							else
-								hdrimage[bx][by] = color;
+								hdrimage[bx][by] = color; */
 						}
 					}
 				}
@@ -480,25 +482,39 @@ int main(int argc, char **argv)
 						}
 					}
 		}
-		
+
+		//make a beep sound
+		cout << '\a' << flush;
 		running = false;
 		t1 = std::chrono::high_resolution_clock::now();
 
 		cout << endl << endl << "Rendering the view took " << timeof((t1-t0).count()) << endl;
 
+		for (int y=0; y<yresolution; y++)
+			for (int x=0; x<xresolution; x++)
+			{
+				vector3 color={0,0,0};
+				for (auto&sample:samples[x][y])
+					color += sample;
+				color = color / samples[x][y].size();
+				if (!scene.current_camera->hdr)
+				{
+					sdrimage[x][y] = color = clamp(color),
+					xsystem.imagedata[y*xresolution+x] = (int)color.x << 16 | (int)color.y << 8 | (int)color.z;
+				}
+				else
+					hdrimage[x][y] = color;
+			}
+
 		if (camera.hdr)
 		{
-			cout << "HDR post-processing..." << endl;
 			string exr_name = camera.image_name;
 			//saveToEXR(image, xresolution, yresolution, "exr/" + camera.image_name);	//save before tone-mapping
 			//saveToEXR(image, xresolution, yresolution, camera.image_name);	//save before tone-mapping
 			applyHDRTonemapping(xsystem, xresolution, yresolution, hdrimage, sdrimage);
-			#ifdef _xdebug
-			XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, xresolution, yresolution);
-			#else
-			cout << "HDR post-processing ended." << endl;
-			#endif
 		}
+		XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, xresolution, yresolution);
+		
 		string png_name /*name can end with .exr, then convert it to .png*/ = camera.image_name;
 		if (camera.hdr)
 			png_name = png_name.substr(0, png_name.size()-4) + ".png";
