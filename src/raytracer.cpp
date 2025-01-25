@@ -475,7 +475,7 @@ int main(int argc, char **argv)
 				for (int y=0; y<yres; y++)
 					if (entropies[x][y] > mean_entropy)
 					{
-						int count = round(entropies[x][y] / mean_entropy);
+						int count = lrint(entropies[x][y] / mean_entropy);
 						tasks[x][y].count += count;
 						pendingsamples-=count;
 						
