@@ -254,6 +254,34 @@ void*estimate(void*)
 	return nullptr;
 }
 
+class Samples
+{
+public:
+	vector3 total={0,0,0};	float average_distance=0;	int n=0;
+	void add(const vector3 & sample)
+	{
+		auto oldmean = total / n;
+		total += sample;
+		auto newmean = total / (n+1);
+		float r = average_distance;
+		float d = norm(newmean - oldmean);
+
+		float distance1 = r>d || d==0 ?	r + d*d/r/3 : 2/3.*d + r*r/d/3;
+		float distance2 = norm(sample - newmean);
+
+		average_distance = (distance1*n + distance2) / (n+1);
+		n++;
+	}
+	float entropy() const
+	{
+		return average_distance;
+	}
+	vector3 mean() const
+	{
+		return total / n;
+	}
+};
+
 int main(int argc, char **argv)
 {
 	unsigned int camera_index=-1;
