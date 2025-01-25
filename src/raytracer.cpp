@@ -253,19 +253,7 @@ public:
 		};
 		auto smartclamp = [this](float sample, float oldmean, float newmean) -> float
 		{
-			/*
-			sample = round(sample);
-			oldmean = round(oldmean);
-			newmean = round(newmean);
-			if (sample<256)	return sample-newmean;
-			if (oldmean==255)	return 0;
-			if (newmean<255)	return sample-newmean;
-			float d = 255-oldmean;
-			if (sample-255 < d*(n-1))	return sample - 255;
-			return d*(n-1);
-			using std::min;
-			return min(sample-newmean, d*(n-1));
-			*/
+			if (scene.current_camera->hdr)	return sample - newmean;
 			if (sample < 255.5)	return sample - newmean;
 			if (oldmean == 255)	return 0;
 			if (newmean < 255)	return sample - newmean;
@@ -291,9 +279,11 @@ public:
 	}
 	float entropy() const
 	{
-		return average_distance;
-		return n<1 ? 0 : average_distance / n;
-		return n<2 ? 0 : average_distance / sqrt(n-1);
+		if (n<2)	return 0;
+		const float scale = norm(mean());	if (scale == 0)	return 0;
+		return average_distance / scale;
+		return n<2 ? 0 : average_distance / n;
+		return n<2 ? 0 : average_distance / sqrt(n);
 	}
 	vector3 mean() const
 	{
@@ -303,6 +293,7 @@ public:
 	}
 };
 
+#include <X11/ImUtil.h>
 int main(int argc, char **argv)
 {
 	unsigned int camera_index=-1;
@@ -514,27 +505,20 @@ int main(int argc, char **argv)
 			#pragma omp parallel for
 			for (int y=0; y<yres; y++)
 				for (int x=0; x<xres; x++)
-					//entropies[x][y] = calculate_entropy(samples[x][y]);
-					//cout << "entropy: " << samples[x][y].entropy() << endl,
-					{
-						entropies[x][y] = samples[x][y].entropy();
-						//cout << "entropy: " << entropies[x][y] << endl;
-						if (entropies[x][y] != entropies[x][y])
-						{
-							cout << "entropy is nan" << endl;
-							exit(1);
-						}
-					}
+					entropies[x][y] = samples[x][y].entropy();
+
 			float mean_entropy=0;
 			for (int x=0; x<xres; x++)
 				for (int y=0; y<yres; y++)
 					mean_entropy += entropies[x][y];
 			mean_entropy = mean_entropy / xres / yres;
-			//cout << "mean entropy: " << mean_entropy << endl;
+			
 			XSetForeground(display, gc, 0x000000);
 			XFillRectangle(display, window, gc, 0, 0, xresolution, yresolution);
+
 			for (int x=0; x<xres; x++)
 				for (int y=0; y<yres; y++)
+				{
 					if (entropies[x][y] > mean_entropy)
 					{
 						int count = lrint(entropies[x][y] / mean_entropy);
@@ -548,11 +532,23 @@ int main(int argc, char **argv)
 
 						if (xsystem.handles[0])	//show where is being sampled
 						{
-							XSetForeground(display, gc, 0x00FF00);
+							/* XSetForeground(display, gc, 0x00FF00);
 							XDrawLine(display, window, gc, x-1, y, x+1, y);
-							XDrawLine(display, window, gc, x, y-1, x, y+1);
+							XDrawLine(display, window, gc, x, y-1, x, y+1); */
 						}
 					}
+					else if (scene.current_camera->hdr)	tasks[x][y].count++;
+				}
+
+			#pragma omp parallel for
+			for (int x=0; x<xres; x++)
+				for (int y=0; y<yres; y++)
+				{
+					const float& c = tasks[x][y].count*9;
+					xsystem.imagedata[y*xresolution+x] = (int)c << 16 | (int)c << 8 | (int)c;
+				}
+			XPutImage(display, window, gc, xsystem.image, 0, 0, 0, 0, xresolution, yresolution);
+
 			XSetForeground(display, gc, 0x000000);
 			XFillRectangle(display, window, gc, 0, 0, xresolution, 10);
 			XSetForeground(display, gc, 0xFFFFFF);

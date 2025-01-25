@@ -51,12 +51,8 @@ void xcleanup(Display*& display, Window& window, GC& gc)
 }
 
 #include <X11/Xutil.h>
-void drawpoint(Display* display, Window window, GC gc, int x, int y, vector4 color)
+void drawpoint(Display* display, Window window, GC gc, int x, int y, const vector3&color)
 {
-	auto ximage = XGetImage(display, window, x, y, 1, 1, AllPlanes, ZPixmap);
-	vector4 current_color;
-	auto pixel = XGetPixel(ximage, 0, 0);
-	current_color.x = pixel >> 16 & 0xFF;
-	current_color.y = pixel >> 8 & 0xFF;
-	current_color.z = pixel & 0xFF;
+	XSetForeground(display, gc, (unsigned long)color.x << 16 | (unsigned long)color.y << 8 | (unsigned long)color.z);
+	XDrawPoint(display, window, gc, x, y);
 }
