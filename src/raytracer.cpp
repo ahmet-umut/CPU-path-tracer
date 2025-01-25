@@ -253,19 +253,25 @@ public:
 		};
 		auto smartclamp = [this](float sample, float oldmean, float newmean) -> float
 		{
+			/*
 			sample = round(sample);
 			oldmean = round(oldmean);
 			newmean = round(newmean);
-
 			if (sample<256)	return sample-newmean;
 			if (oldmean==255)	return 0;
 			if (newmean<255)	return sample-newmean;
 			float d = 255-oldmean;
 			if (sample-255 < d*(n-1))	return sample - 255;
 			return d*(n-1);
-
 			using std::min;
 			return min(sample-newmean, d*(n-1));
+			*/
+			if (sample < 255.5)	return sample - newmean;
+			if (oldmean == 255)	return 0;
+			if (newmean < 255)	return sample - newmean;
+			float d = 255 - oldmean;
+			using std::min;
+			return min(sample-255, d * (n - 1));
 		};
 		float distance2 = norm(apply(smartclamp, sample, oldmean, newmean));
 
@@ -285,8 +291,8 @@ public:
 	}
 	float entropy() const
 	{
-		return n<1 ? 0 : average_distance / n;
 		return average_distance;
+		return n<1 ? 0 : average_distance / n;
 		return n<2 ? 0 : average_distance / sqrt(n-1);
 	}
 	vector3 mean() const
