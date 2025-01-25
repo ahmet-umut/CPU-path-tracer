@@ -253,24 +253,23 @@ public:
 		};
 		auto smartclamp = [this](float sample, float oldmean, float newmean) -> float
 		{
-			if (sample<254.5)	return sample-newmean;
-			if (oldmean>254.5)
-			{
-				//cout << "oldmean is greater than 254.5" << endl;
-				return 0;
-			}
-			if (newmean<254.5)
-			{
-				//cout << "sample is too bright but it could not increase the new mean "
-				return sample-newmean;
-			}
+			sample = round(sample);
+			oldmean = round(oldmean);
+			newmean = round(newmean);
+
+			if (sample<256)	return sample-newmean;
+			if (oldmean==255)	return 0;
+			if (newmean<255)	return sample-newmean;
 			float d = 255-oldmean;
+			if (sample-255 < d*(n-1))	return sample - 255;
+			return d*(n-1);
+
 			using std::min;
-			return min(sample-255, d*(n-1));
+			return min(sample-newmean, d*(n-1));
 		};
 		float distance2 = norm(apply(smartclamp, sample, oldmean, newmean));
 
-		average_distance = (distance1*n + distance2) / n;
+		average_distance = (distance1*(n-1) + distance2) / n;
 		if (average_distance != average_distance)
 		{
 			cout << "average_distance is nan" << endl;
@@ -286,7 +285,9 @@ public:
 	}
 	float entropy() const
 	{
-		return n<2 ? 0 : average_distance / (n-1);
+		return n<1 ? 0 : average_distance / n;
+		return average_distance;
+		return n<2 ? 0 : average_distance / sqrt(n-1);
 	}
 	vector3 mean() const
 	{
