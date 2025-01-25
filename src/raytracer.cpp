@@ -188,42 +188,6 @@ vector3 sample(int x, int y)
 	return sampled_color;
 }
 
-const int block_size = 10;
-void sampler(int blockx, int blocky)
-{
-	int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
-	auto tasks = (Task(*)[yres])taskp;
-	auto samples = (vector<vector3>(*)[yres])samplep;
-	auto image = (vector3(*)[yres])sdrimagep;
-	//auto hdrimage = (vector3(*)[yres])hdrimagep;
-
-	//cout << "sampler: " << blockx << " " << blocky << endl;
-
-	for (int y=blocky; y<yres && y < blocky+block_size; y++)
-	{
-		for (int x=blockx; x<xres && x < blockx+block_size; x++)
-		{
-			for (int sampleindex=0; sampleindex<tasks[x][y].count; sampleindex++)
-			{
-				samples[x][y].push_back(sample(x, y));
-				tasks[x][y].count--;
-				//cout << "sampler: " << x << " " << y << " " << sampleindex << endl;
-				totalsamples++;
-			}
-			vector3 color={0,0,0};
-			for (auto&sample:samples[x][y])
-				color += sample;
-			color = color / samples[x][y].size();
-			image[x][y] = clamp(color);
-			xsystem.imagedata[y*xres+x] = (int)image[x][y].x << 16 | (int)image[x][y].y << 8 | (int)image[x][y].z;
-		}
-	}
-
-	for (int y=blocky; y<yres && y < blocky+block_size; y++)
-		for (int x=blockx; x<xres && x < blockx+block_size; x++)
-			tasks[x][y].assigned = false;
-};
-
 void*estimate(void*)
 {
 	counter = 0;
@@ -241,9 +205,9 @@ void*estimate(void*)
 		float a = (float)(time1*x2/x1 - time2).count() / (1 - exp(x2) - x2/x1 + exp(x1)*x2/x1);
 		float b = (time2.count() - a * (1 - exp(x2))) / x2;
 
-		//cout << "estimated remaining/total time: " << timeof(a * (1 - exp(1)) + b - time2.count()) << " / " << timeof(a * (1 - exp(1)) + b)
-			cout << "pending samples: " << pendingsamples
-			<< "  \r" << flush;
+		cout << timeof(a * (1 - exp(1)) + b - time2.count()) << " remaining out of " << timeof(a * (1 - exp(1)) + b);
+		cout << ". pending samples: " << pendingsamples;
+		cout << "   \r" << flush;
 		if (timeoverflow)
 		{
 			//cout << endl << "estimator debug: a = " << a << " b = " << b << " x1 = " << x1 << " x2 = " << x2 << " time1 = " << time1.count() << " time2 = " << time2.count();
@@ -260,17 +224,65 @@ public:
 	vector3 total={0,0,0};	float average_distance=0;	int n=0;
 	void add(const vector3 & sample)
 	{
-		auto oldmean = total / n;
-		total += sample;
-		auto newmean = total / (n+1);
+		if (xsystem.handles[1])
+		{
+			total+=sample;
+			n++;
+			return;
+		}
+		vector3 oldmean = mean();
+		total += sample;	n++;
+		vector3 newmean = mean();
 		float r = average_distance;
 		float d = norm(newmean - oldmean);
 
-		float distance1 = r>d || d==0 ?	r + d*d/r/3 : 2/3.*d + r*r/d/3;
-		float distance2 = norm(sample - newmean);
+		float distance1;
+		if (r==0 && d==0)
+			distance1 = 0;
+		else if (r>d)
+			distance1 = r + d*d/r/3;
+		else
+			distance1 = 2/3.*d + r*r/d/3;
 
-		average_distance = (distance1*n + distance2) / (n+1);
-		n++;
+		//lambda with auto and variadic parameters
+		auto apply = [](auto f, auto... args) -> vector3
+		{
+			vector3 destination;
+			destination.x = f(args.x...);	destination.y = f(args.y...);	destination.z = f(args.z...);
+			return destination;
+		};
+		auto smartclamp = [this](float sample, float oldmean, float newmean) -> float
+		{
+			if (sample<254.5)	return sample-newmean;
+			if (oldmean>254.5)
+			{
+				//cout << "oldmean is greater than 254.5" << endl;
+				return 0;
+			}
+			if (newmean<254.5)
+			{
+				//cout << "sample is too bright but it could not increase the new mean "
+				return sample-newmean;
+			}
+			float d = 255-oldmean;
+			using std::min;
+			return min(sample-255, d*(n-1));
+		};
+		float distance2 = norm(apply(smartclamp, sample, oldmean, newmean));
+
+		average_distance = (distance1*n + distance2) / n;
+		if (average_distance != average_distance)
+		{
+			cout << "average_distance is nan" << endl;
+			//dump
+			cout << "oldmean: " << oldmean << endl;
+			cout << "newmean: " << newmean << endl;
+			cout << "r: " << r << endl;
+			cout << "d: " << d << endl;
+			cout << "distance1: " << distance1 << endl;
+			cout << "distance2: " << distance2 << endl;
+			exit(1);
+		}
 	}
 	float entropy() const
 	{
@@ -278,7 +290,9 @@ public:
 	}
 	vector3 mean() const
 	{
-		return total / n;
+		if (n==0)	return vector3{0,0,0};
+		if (scene.current_camera->hdr)	return total / n;
+		return clamp(total / n);
 	}
 };
 
@@ -421,7 +435,8 @@ int main(int argc, char **argv)
 		vector3 sdrimage[xresolution][yresolution];	sdrimagep = sdrimage;
 		vector3 hdrimage[xresolution][yresolution];	hdrimagep = hdrimage;
 		Task tasks[xresolution][yresolution];	taskp = tasks;
-		vector<vector3> samples[xresolution][yresolution];	samplep = samples;
+		//vector<vector3> samples[xresolution][yresolution];	samplep = samples;
+		Samples samples[xresolution][yresolution];	samplep = samples;
 
 		//first make the background for Xwindow gray
 		XSetForeground(display, gc, 0x808080);
@@ -452,25 +467,27 @@ int main(int argc, char **argv)
 		while (totalsamples < camera.sample_count*xresolution*yresolution)
 		{
 			//cout << "totalsamples: " << (int)totalsamples << " pendingsamples: " << pendingsamples << " " << endl;
+			constexpr int stripsize=9;
 			#pragma omp parallel for
-			for (int y=0; y<yresolution; y+=block_size)
-				for (int x=0; x<xresolution; x+=block_size)
+			for (int x=0; x<xresolution; x+=stripsize)
+			{
+				for (int y=0; y<yresolution; y++)
 				{
 					int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
 					auto tasks = (Task(*)[yres])taskp;
-					auto samples = (vector<vector3>(*)[yres])samplep;
+					//auto samples = (vector<vector3>(*)[yres])samplep;
 					auto image = (vector3(*)[yres])sdrimagep;
 
-					for (int by=y; by<yres && by < y+block_size; by++)
+					for (int bx=x; bx<xres && bx < x+stripsize; bx++)
 					{
-						for (int bx=x; bx<xres && bx < x+block_size; bx++)
+						while (tasks[bx][y].count)
 						{
-							while (tasks[bx][by].count)
-							{
-								samples[bx][by].push_back(sample(bx, by));
-								tasks[bx][by].count--;
-								totalsamples++;
-							}
+							samples[bx][y].add(sample(bx, y));
+							tasks[bx][y].count--;
+							totalsamples++;
+							//cout << "totalsamples: " << (int)totalsamples << " pendingsamples: " << pendingsamples << " " << endl;
+						}
+					}
 							/* vector3 color={0,0,0};
 							for (auto&sample:samples[bx][by])
 								color += sample;
@@ -482,23 +499,35 @@ int main(int argc, char **argv)
 							}
 							else
 								hdrimage[bx][by] = color; */
-						}
-					}
 				}
+			}
 			if (totalsamples >= camera.sample_count*xresolution*yresolution)	break;
 
 			float entropies[xres][yres];
 			#pragma omp parallel for
 			for (int y=0; y<yres; y++)
-				for (int x=0; x<xres; x++) if (!tasks[x][y].assigned)
-					entropies[x][y] = calculate_entropy(samples[x][y]);
+				for (int x=0; x<xres; x++)
+					//entropies[x][y] = calculate_entropy(samples[x][y]);
+					//cout << "entropy: " << samples[x][y].entropy() << endl,
+					{
+						entropies[x][y] = samples[x][y].entropy();
+						//cout << "entropy: " << entropies[x][y] << endl;
+						if (entropies[x][y] != entropies[x][y])
+						{
+							cout << "entropy is nan" << endl;
+							exit(1);
+						}
+					}
 			float mean_entropy=0;
 			for (int x=0; x<xres; x++)
 				for (int y=0; y<yres; y++)
 					mean_entropy += entropies[x][y];
 			mean_entropy = mean_entropy / xres / yres;
-			
 			//cout << "mean entropy: " << mean_entropy << endl;
+			XSetForeground(display, gc, 0x000000);
+			XFillRectangle(display, window, gc, 0, 0, xresolution, yresolution);
+			XSetForeground(display, gc, 0xFFFFFF);
+			XDrawString(display, window, gc, 0, 10, ("mean entropy: " + std::to_string(mean_entropy)).c_str(), ("mean entropy: " + std::to_string(mean_entropy)).size());
 			for (int x=0; x<xres; x++)
 				for (int y=0; y<yres; y++)
 					if (entropies[x][y] > mean_entropy)
@@ -532,9 +561,9 @@ int main(int argc, char **argv)
 			for (int x=0; x<xresolution; x++)
 			{
 				vector3 color={0,0,0};
-				for (auto&sample:samples[x][y])
-					color += sample;
-				color = color / samples[x][y].size();
+				//for (auto&sample:samples[x][y])	color += sample;
+				//color = color / samples[x][y].size();
+				color = samples[x][y].mean();
 				if (!scene.current_camera->hdr)
 				{
 					sdrimage[x][y] = color = clamp(color),
