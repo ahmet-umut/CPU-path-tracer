@@ -205,7 +205,7 @@ void*estimate(void*)
 		float a = (float)(time1*x2/x1 - time2).count() / (1 - exp(x2) - x2/x1 + exp(x1)*x2/x1);
 		float b = (time2.count() - a * (1 - exp(x2))) / x2;
 
-		cout << timeof(a * (1 - exp(1)) + b - time2.count()) << " remaining out of " << timeof(a * (1 - exp(1)) + b);
+		cout << "\t" <<  timeof(a * (1 - exp(1)) + b - time2.count()) << " remaining out of " << timeof(a * (1 - exp(1)) + b);
 		cout << ". pending samples: " << pendingsamples;
 		cout << "   \r" << flush;
 		if (timeoverflow)
@@ -286,7 +286,7 @@ public:
 	}
 	float entropy() const
 	{
-		return average_distance;
+		return n<2 ? 0 : average_distance / (n-1);
 	}
 	vector3 mean() const
 	{
@@ -526,8 +526,6 @@ int main(int argc, char **argv)
 			//cout << "mean entropy: " << mean_entropy << endl;
 			XSetForeground(display, gc, 0x000000);
 			XFillRectangle(display, window, gc, 0, 0, xresolution, yresolution);
-			XSetForeground(display, gc, 0xFFFFFF);
-			XDrawString(display, window, gc, 0, 10, ("mean entropy: " + std::to_string(mean_entropy)).c_str(), ("mean entropy: " + std::to_string(mean_entropy)).size());
 			for (int x=0; x<xres; x++)
 				for (int y=0; y<yres; y++)
 					if (entropies[x][y] > mean_entropy)
@@ -548,6 +546,10 @@ int main(int argc, char **argv)
 							XDrawLine(display, window, gc, x, y-1, x, y+1);
 						}
 					}
+			XSetForeground(display, gc, 0x000000);
+			XFillRectangle(display, window, gc, 0, 0, xresolution, 10);
+			XSetForeground(display, gc, 0xFFFFFF);
+			XDrawString(display, window, gc, 0, 10, ("mean entropy: " + std::to_string(mean_entropy)).c_str(), ("mean entropy: " + std::to_string(mean_entropy)).size());
 		}
 
 		//make a beep sound
