@@ -462,41 +462,22 @@ int main(int argc, char **argv)
 		pendingsamples = xres * yres * (camera.sample_count-spp0);
 
 		totalsamples=0;
+		bool render=true;
 		while (totalsamples < camera.sample_count*xresolution*yresolution)
 		{
 			//cout << "totalsamples: " << (int)totalsamples << " pendingsamples: " << pendingsamples << " " << endl;
 			constexpr int stripsize=9;
 			#pragma omp parallel for
-			for (int x=0; x<xresolution; x+=stripsize)
+			for (int x=0; x<xresolution; x++)
 			{
 				for (int y=0; y<yresolution; y++)
 				{
-					int xres = scene.current_camera->image_resolution[0], yres = scene.current_camera->image_resolution[1];
-					auto tasks = (Task(*)[yres])taskp;
-					//auto samples = (vector<vector3>(*)[yres])samplep;
-					auto image = (vector3(*)[yres])sdrimagep;
-
-					for (int bx=x; bx<xres && bx < x+stripsize; bx++)
+					while (tasks[x][y].count)
 					{
-						while (tasks[bx][y].count)
-						{
-							samples[bx][y].add(sample(bx, y));
-							tasks[bx][y].count--;
-							totalsamples++;
-							//cout << "totalsamples: " << (int)totalsamples << " pendingsamples: " << pendingsamples << " " << endl;
-						}
+						samples[x][y].add(sample(x, y));
+						tasks[x][y].count--;
+						totalsamples++;
 					}
-							/* vector3 color={0,0,0};
-							for (auto&sample:samples[bx][by])
-								color += sample;
-							color = color / samples[bx][by].size();
-							if (!scene.current_camera->hdr)
-							{
-								sdrimage[bx][by] = color = clamp(color),
-								xsystem.imagedata[by*xres+bx] = (int)color.x << 16 | (int)color.y << 8 | (int)color.z;
-							}
-							else
-								hdrimage[bx][by] = color; */
 				}
 			}
 			if (totalsamples >= camera.sample_count*xresolution*yresolution)	break;

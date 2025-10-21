@@ -19,15 +19,16 @@ Ray::Ray(const vector3&start, const float & xzangl, const float & yangl):
 
 float Ray::getxzangl()
 {
-	if (xzangl==xzangl)
+	if (xzangl!=INFINITY)
 		return xzangl;
-	cout << "initializing xzangl" << endl;
+	//cout << "initializing xzangl" << endl;
 	return xzangl = atan2(direction.z, direction.x);
 }
 float Ray::getyangl()
 {
-	if (yangl==yangl)
+	if (yangl!=INFINITY)
 		return yangl;
+	//cout << "initializing yangl" << endl;
 	return yangl = atan2(direction.y, sqrt(direction.x*direction.x + direction.z*direction.z));
 }
 vector3 Ray::getend()
@@ -154,12 +155,6 @@ struct Intersection Ray::intersect(Sphere& sphere, bool transformed)
 {
 	if (!transformed)
 	{
-		/* matrix inverse=sphere.transformation;
-
-		lapack_int ipiv[4];
-		LAPACKE_sgetrf(LAPACK_ROW_MAJOR, 4, 4, (float*)&inverse, 4, ipiv);
-		LAPACKE_sgetri(LAPACK_ROW_MAJOR, 4, (float*)&inverse, 4, ipiv); */
-
 		Ray ray = {transform(sphere.inverse, start), transform(sphere.inverse, getdirection(), false)};
 		//ray = *this;
 
@@ -178,10 +173,8 @@ struct Intersection Ray::intersect(Sphere& sphere, bool transformed)
 		return {false};
 	}
 
-	vector3 l = sphere.center +- start;
-	//vector3 d(xzangl, yangl);
+	vector3 l = sphere.center - start;
 	vector3 d = getdirection().normalize();
-	//float tca = l.dot({cos(xzangl) * cos(yangl), sin(yangl), sin(xzangl) * cos(yangl)});
 	float tca = cblas_sdot(3, &l, 1, &d, 1);
 	
 	if (tca < 0)
@@ -215,17 +208,6 @@ struct Intersection Ray::intersect(Sphere& sphere, bool transformed)
 using namespace std;
 struct Intersection Ray::intersect(Mesh& mesh, int debug_level)
 {
-	//matrix inverse=mesh.transformation;
-
-	/* cout << inverse.row0 << endl;
-	cout << inverse.row1 << endl;
-	cout << inverse.row2 << endl;
-	cout << inverse.row3 << endl; */
-
-	/* lapack_int ipiv[4];
-	LAPACKE_sgetrf(LAPACK_ROW_MAJOR, 4, 4, (float*)&inverse, 4, ipiv);
-	LAPACKE_sgetri(LAPACK_ROW_MAJOR, 4, (float*)&inverse, 4, ipiv); */
-
 	Ray ray;
 	ray = {transform(mesh.inverse, start), transform(mesh.inverse, getdirection(), false)};
 	//ray = *this;

@@ -6,7 +6,7 @@ class Ray
 {
 public:
 	vector3 start, direction;
-	float xzangl=INFINITY, yangl;
+	float xzangl=INFINITY, yangl=INFINITY;
 	float length;
 
 	Ray() : length(-1) {}

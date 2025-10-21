@@ -28,9 +28,9 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 	vector3 irradiance;
 	struct Intersection first = intersect(scene,ray,verbose), second;
 	float specularcos, objecttolight;
-	pathlength += norm(first.position +- ray.start);
+	pathlength += norm(first.position - ray.start);
 
-	vector3 correction, wo = ray.start +- first.position, wi, h, reflection, mirrorwo, d, normal, attenuation = {1,1,1};
+	vector3 correction, wo = ray.start - first.position, wi, h, reflection, mirrorwo, d, normal, attenuation = {1,1,1};
 	Ray reflectionray, refractionray;
 	bool entering;
 	float nratio, costeta, cosphi, rparallel, rperpendicular, n1,n2, fr,ft;
@@ -51,8 +51,6 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 				cout << "Scene does not have background texture." << endl;
 			return scene.background_color;
 		case Scene::latlong:	//latlong image
-			if (verbose)
-				cout << "Scene has background texture." << endl;
 			{
 				/* float u,v;
 				float&xz=ray.xzangl;
@@ -71,13 +69,17 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 				}
 				vector3 color = scene.images[scene.background.image_indice][rint(v * resy)][rint(u * resx)];
 				if (verbose)
+				{
+					cout << "Scene has background texture latlong." << endl;
+					cout << "coords: " << u << " " << v << endl;
 					cout << "background color: " << color << endl;
+				}
 				return color;
 			}
 			break;
 		case Scene::probe:	//probe image
 			if (verbose)
-				cout << "Scene has background texture." << endl;
+				cout << "Scene has background texture probe." << endl;
 			{
 				/* float u,v;
 				float&xz=ray.xzangl;
@@ -266,8 +268,8 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 		if (first.getobject()->getmaterial().is_mirror())
 		{
 			if (depth == scene.max_recursion_depth)	goto label;
-			mirrorwo = ray.start +- first.position;
-			reflection = mirrorwo + (first.normal * dot(mirrorwo, first.normal) +- mirrorwo) * 2.f;
+			mirrorwo = ray.start - first.position;
+			reflection = mirrorwo + (first.normal * dot(mirrorwo, first.normal) - mirrorwo) * 2.f;
 			if (verbose)
 			{
 				cout << "normal: " << first.normal << endl;
@@ -293,7 +295,7 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 			costeta = fabs(costeta);
 
 			if (!entering)
-				attenuation = first.getobject()->getmaterial().AbsorptionCoefficient * norm(ray.start +- first.position),
+				attenuation = first.getobject()->getmaterial().AbsorptionCoefficient * norm(ray.start - first.position),
 				attenuation = {exp(-attenuation.x), exp(-attenuation.y), exp(-attenuation.z)};
 
 			if (depth == scene.max_recursion_depth)	goto label;
@@ -315,8 +317,8 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 			{
 				correction = normal * scene.shadow_ray_epsilon;
 
-				mirrorwo = ray.start +- first.position;
-				reflection = mirrorwo + (first.normal * dot(mirrorwo, first.normal) +- mirrorwo) * 2.f;
+				mirrorwo = ray.start - first.position;
+				reflection = mirrorwo + (first.normal * dot(mirrorwo, first.normal) - mirrorwo) * 2.f;
 				reflectionray = {first.position + correction, reflection};
 
 				mirror = sendray(scene, reflectionray, verbose, depth + 1, pathlength, {0,0,false}, xsystem);
@@ -329,14 +331,14 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 			fr = (powf(rparallel, 2) + powf(rperpendicular, 2)) / 2;	ft = 1 - fr;
 			
 			d = ray.getdirection().normalize();	//I think this is normalized by default, so no need to normalize again
-			refractionray = {first.position + correction , (d + normal * costeta) * nratio +- normal * cosphi};
+			refractionray = {first.position + correction , (d + normal * costeta) * nratio - normal * cosphi};
 			dielectric = sendray(scene, refractionray, verbose, depth + 1, pathlength, {0,0,false}, xsystem) * ft;
 			//dielectric = piecewise(sendray(refractionray, verbose, depth + 1, pathlength), attenuation) * ft;
 			vsMul(3, (float*)&attenuation, (float*)&dielectric, (float*)&dielectric);
 
-			mirrorwo = ray.start +- first.position;
-			reflection = mirrorwo + (first.normal * dot(mirrorwo, first.normal) +- mirrorwo) * 2.f;
-			reflectionray = {first.position +- correction, reflection};
+			mirrorwo = ray.start - first.position;
+			reflection = mirrorwo + (first.normal * dot(mirrorwo, first.normal) - mirrorwo) * 2.f;
+			reflectionray = {first.position - correction, reflection};
 			mirror = sendray(scene, reflectionray, verbose, depth + 1, pathlength, {0,0,false}, xsystem) * fr;
 		}
 
@@ -346,7 +348,7 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 		{
 			if (first.getobject()->islightsource())
 			{
-				//wi = ray.start +- first.position;
+				//wi = ray.start - first.position;
 				//vector3 radiance = first.getobject()->getradiance();
 				return first.getobject()->getradiance();	// / pow(norm(first.position-ray.start), 2) * abs(dot(first.normal, normalized(ray.getdirection())));
 			}
@@ -363,11 +365,11 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 						if (!second.intersecting)
 						{
 							irradiance = light.getradiance(newray);
-							wi = newray.getend() +- first.position;
+							wi = newray.getend() - first.position;
 							{
 								vector3 diff = k_diffuse*cosclamp(first.normal, wi);
 								vsMul(3, (float*)&irradiance, (float*)&diff, (float*)&diff);
-								diffuse = diffuse + diff;	//vsAdd could be used here
+								diffuse += diff;	//vsAdd could be used here
 							}
 							normalized(wi, wi);
 							normalized(wo, wo);
@@ -396,7 +398,7 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 						{
 							vector3 diff = k_diffuse*cosclamp(first.normal, wi);
 							vsMul(3, (float*)&radiance, (float*)&diff, (float*)&diff);
-							diffuse = diffuse + diff;	//vsAdd could be used here
+							diffuse += diff;	//vsAdd could be used here
 						}
 						nee_count++;
 					}
@@ -407,8 +409,8 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 				{
 					//uniformly sample the hemisphere
 					vector3 w = first.normal, u = perp_dir(w).normalize(), v = w.cross(u).normalize();
-					float xz = drand48() * 2 * M_PI, h = drand48(), r = sqrt(1-h*h);
-					vector3 d = u * cos(xz) * r + v * sin(xz) * r + w * h;
+					float xz = drand48() * 2 * M_PI, height = drand48(), r = sqrt(1-height*height);
+					vector3 d = u * cos(xz) * r + v * sin(xz) * r + w * height;
 					Ray newray(first.position + correction, d);
 
 					Path*path = nullptr;
@@ -423,11 +425,22 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 					{
 						vector3 diff = k_diffuse*cosclamp(first.normal, wi);
 						vsMul(3, (float*)&radiance, (float*)&diff, (float*)&diff);
-						diffuse = diffuse + diff;	//vsAdd could be used here
+						diffuse += diff;	//vsAdd could be used here
+					}
+
+					wi = newray.getend() - first.position;
+					normalized(wi, wi);
+					normalized(wo, wo);
+					h = (wi+wo);
+					specularcos = cosclamp(first.normal, h);
+					{
+						vector3 spec = first.getobject()->getmaterial().specular * powf(specularcos, first.getobject()->getmaterial().phong_exponent);
+						vsMul(3, (float*)&irradiance, (float*)&spec, (float*)&spec);
+						vsAdd(3, (float*)&specular, (float*)&spec, (float*)&specular);
 					}
 				}
 
-				return diffuse / (splitcount + nee_count) + mirror + dielectric;
+				return diffuse / (splitcount + nee_count) + mirror + dielectric + specular;
 			}
 			else return {0,0,0};
 		}
@@ -451,11 +464,11 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 				}
 				//pathlength += objecttolight;
 				irradiance = light.getradiance(newray);
-				wi = newray.getend() +- first.position;
+				wi = newray.getend() - first.position;
 				{
 					vector3 diff = k_diffuse*cosclamp(first.normal, wi);
 					vsMul(3, (float*)&irradiance, (float*)&diff, (float*)&diff);
-					diffuse = diffuse + diff;	//vsAdd could be used here
+					diffuse += diff;	//vsAdd could be used here
 				}
 				normalized(wi, wi);
 				normalized(wo, wo);
@@ -507,7 +520,7 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 				{
 					vector3 diff = k_diffuse*cosclamp(first.normal, wi);
 					vsMul(3, (float*)&irradiance, (float*)&diff, (float*)&diff);
-					diffuse = diffuse + diff;	//vsAdd could be used here
+					diffuse += diff;	//vsAdd could be used here
 				}
 				normalized(wi, wi);
 				normalized(wo, wo);
@@ -549,7 +562,7 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 				{
 					vector3 diff = k_diffuse*cosclamp(first.normal, wi);
 					vsMul(3, (float*)&irradiance, (float*)&diff, (float*)&diff);
-					diffuse = diffuse + diff;	//vsAdd could be used here
+					diffuse += diff;	//vsAdd could be used here
 				}
 				normalized(wi, wi);
 				normalized(wo, wo);
@@ -587,11 +600,11 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 				if (verbose)
 					cout << "object is not in shadow" << endl;
 				irradiance = light.getradiance(shadowray);
-				wi = spotlight.position +- first.position;
+				wi = spotlight.position - first.position;
 				{
 					vector3 diff = k_diffuse*cosclamp(first.normal, wi);
 					vsMul(3, (float*)&irradiance, (float*)&diff, (float*)&diff);
-					diffuse = diffuse + diff;	//vsAdd could be used here
+					diffuse += diff;	//vsAdd could be used here
 				}
 				normalized(wi, wi);
 				normalized(wo, wo);
@@ -657,7 +670,7 @@ vector3 sendray(Scene&scene, Ray ray, bool verbose, uint depth, float pathlength
 				{
 					vector3 diff = k_diffuse*cosclamp(first.normal, wi);
 					vsMul(3, (float*)&irradiance, (float*)&diff, (float*)&diff);
-					diffuse = diffuse + diff;	//vsAdd could be used here
+					diffuse += diff;	//vsAdd could be used here
 				}
 
 				normalized(wi, wi);
